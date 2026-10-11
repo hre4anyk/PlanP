@@ -213,7 +213,7 @@ export function CarApp() {
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col lg:flex-row">
-      <div className="relative min-h-0 flex-1">
+      <div key={journey.status === "ready" ? "journey" : "map"} className="relative min-h-0 flex-1">
         {journey.status === "ready" ? (
           <StreetJourney
             frames={journey.frames}
