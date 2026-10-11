@@ -7,10 +7,11 @@ export type WorkerBox = { x: number; y: number; w: number; h: number };
 export type WorkerRequest = { type: "init"; origin: string } | { type: "frame"; bitmap: ImageBitmap; timestamp: number };
 export type WorkerResponse =
   | { type: "ready"; delegate: "GPU" | "CPU" }
-  | { type: "result"; seats: WorkerBox[]; people: WorkerBox[]; timestamp: number; inferenceMs: number }
+  | { type: "result"; seats: WorkerBox[]; people: WorkerBox[]; vehicles: WorkerBox[]; timestamp: number; inferenceMs: number }
   | { type: "error"; message: string };
 
 const SEAT_LABELS = new Set(["chair", "couch", "bench"]);
+const VEHICLE_LABELS = new Set(["car", "truck", "bus", "motorcycle"]);
 let detector: ObjectDetector | null = null;
 
 const post = (message: WorkerResponse) => (self as unknown as DedicatedWorkerGlobalScope).postMessage(message);
@@ -24,7 +25,7 @@ async function init(origin: string) {
     runningMode: "VIDEO" as const,
     scoreThreshold: 0.25,
     maxResults: 40,
-    categoryAllowlist: ["chair", "couch", "bench", "person"],
+    categoryAllowlist: ["chair", "couch", "bench", "person", "car", "truck", "bus", "motorcycle"],
   });
   try {
     detector = await ObjectDetector.createFromOptions(files, options("GPU"));
@@ -53,6 +54,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     const { width: w, height: h } = bitmap;
     const seats: WorkerBox[] = [];
     const people: WorkerBox[] = [];
+    const vehicles: WorkerBox[] = [];
     for (const d of detector.detectForVideo(bitmap, timestamp).detections) {
       const b = d.boundingBox;
       const label = d.categories[0]?.categoryName;
@@ -60,8 +62,9 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       const box = { x: b.originX / w, y: b.originY / h, w: b.width / w, h: b.height / h };
       if (label === "person") people.push(box);
       else if (SEAT_LABELS.has(label)) seats.push(box);
+      else if (VEHICLE_LABELS.has(label)) vehicles.push(box);
     }
-    post({ type: "result", seats, people, timestamp, inferenceMs: performance.now() - started });
+    post({ type: "result", seats, people, vehicles, timestamp, inferenceMs: performance.now() - started });
   } catch (e) {
     post({ type: "error", message: e instanceof Error ? e.message : String(e) });
   } finally {

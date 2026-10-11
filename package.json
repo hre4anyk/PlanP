@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@base-ui/react": "^1.8.0",
     "@mediapipe/tasks-vision": "^1.1.0",
     "@stellar/stellar-sdk": "^17.1.0",

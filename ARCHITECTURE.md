@@ -46,6 +46,7 @@ src/                         Next.js app (Netlify)
     chain.ts                 closest-first ranking + chain extension (fallback, both modes)
     chain.test.ts
     seats.ts                 room scan, chair IDs, free/taken with debounce, steps + direction
+    anchors.ts               pin seats to room directions (phone orientation), project to screen, snap to live detections
     seats.test.ts
     route.ts                 OSRM call with 5 s timeout → straight-line fallback (one path + drive minutes per leg)
     route.test.ts
@@ -54,7 +55,8 @@ src/                         Next.js app (Netlify)
   vision/
     detector.ts              starts the detector worker; sends one camera frame at a time (stale frames dropped)
     detector-worker.ts       Web Worker running MediaPipe (GPU first, CPU fallback with a fresh runtime)
-    frame.ts                 grab a JPEG from the video, cropped to one chair
+    marks.ts                 snapshot with numbered boxes drawn on it, for Claude ("set of marks")
+    orientation.ts           phone orientation (iPhone asks permission on tap) → camera yaw/pitch
   voice/
     realtime.ts              WebRTC session, tool definitions, announce(text)
   ai/
@@ -121,9 +123,11 @@ All model IDs and prices sit in `src/ai/models.ts` (and the planner's in `engine
 | Job | Where | Model | Input → output | Latency budget |
 |---|---|---|---|---|
 | Plan / re-plan chain | Anbaric agentic action | `claude-opus-5-5`, effort `low` | job properties → `{ chain: ChainItem[], spoken: string }` (structured output) | 6 s |
-| Describe driver / is-this-the-driver | `/api/look` | `claude-opus-5-5`, effort `low` | small JPEG (+ driver description) → `{ description }` / `{ isDriver, confidence }` | 4 s, then buttons |
+| Seat check (which boxes are real seats, which are taken) | `/api/look` mode `seats` | `claude-opus-5-5`, effort `low`, server-side fallback on | JPEG with numbered boxes → `{ seats[], missed[], summary }` | ~5 s, once per scan |
+| Street check (open, legal curb space?) | `/api/look` mode `street` | `claude-opus-5-5`, effort `low` | dashboard JPEG with numbered vehicles → `{ spot, parkedIds, signs }` | ~5 s, on demand / every few seconds |
+| Is-this-the-driver (later batch) | `/api/look` | `claude-opus-5-5`, effort `low` | small JPEG + driver description → `{ isDriver, confidence }` | 4 s, then buttons |
 | Voice conversation + tool calls | browser ⇄ OpenAI over WebRTC | `gpt-realtime-2.1-mini` | speech ⇄ speech; tools `find_spot`, `lot_full`, `parked`, `where_to`, `repeat` | real-time |
-| Chair + person detection | browser | MediaPipe EfficientDet-Lite0 (not an AI service) | frame → boxes (`chair`, `couch`, `person`) | < 100 ms per frame |
+| Chair + person (+ vehicle) detection | browser worker | MediaPipe EfficientDet-Lite0 (not an AI service) | frame → boxes (`chair`, `couch`, `bench`, `person`, `car`, `truck`, `bus`, `motorcycle`) | < 100 ms per frame |
 
 Notes:
 - **Claude in Anbaric:** `AnthropicAgent` + `RemoteLLMAgenticAction` with a JSON Schema for the chain. Anbaric constrains the output to the schema; our code still checks every ID against the candidates and drops unknown ones. The prompt is saved in Anbaric's prompt manager, so it's versioned and visible in the console.
@@ -136,7 +140,9 @@ Notes:
 
 | Step | Fails how | Fallback | Trace shows |
 |---|---|---|---|
-| Detector | model fails to load | Message + switch to Park my car | n/a |
+| Detector | model fails to load | Message + "Use Park my car instead" link | n/a |
+| Claude seat check | error / no key | Use the detector's candidates, say so on screen | `fallback: true` |
+| Orientation sensors | denied or absent (laptops) | Seats stay where they were scanned; badge says "hold still" | n/a |
 | Claude photo check | error, low confidence, or > 4 s | "That's me" / "Someone else" buttons | `fallback: true` |
 | Anbaric engine / planner | unreachable, > 6 s, invalid IDs | `chain.ts` closest-first in the browser, generic reasons; events queued and retried | `fallback: true` |
 | OpenAI Realtime | can't connect or drops | Big buttons; announcements via browser `speechSynthesis` | `fallback: true` |
@@ -144,16 +150,16 @@ Notes:
 
 ## 6. Key sequences
 
-### 6.1 Park me: the chair thief
+### 6.1 Park me: handheld, the chair thief
 
-1. **Start:** `POST /api/engine/sessions { mode: "me" }` → Anbaric job in `scanning`.
-2. **Scan (2 s, browser):** detector boxes for `chair`/`couch` are merged across frames into stable seats. Distance uses a pinhole model: `distance ≈ 0.85 m × focalPx / boxHeightPx`, focal length from an assumed ~65° horizontal field of view; `steps = distance / 0.75`. Direction comes from the box's horizontal position. Seats are posted to the job → `ready`.
-3. **This is me:** `/api/look` describes the driver; stored on the job.
-4. **Occupancy (every frame, browser):** a seat is taken when a `person` box covers ≥ 30% of its lower half for ≥ 1 s; free after 2 s without. No network.
-5. **Find a spot:** the voice model calls `find_spot(wish)` → event to the job → `planning` → Claude agent writes `chain` → `guiding`. The browser polls `GET /sessions/:id` (about once a second) and shows A/B/C; the voice announces Plan A.
-6. **Target seat becomes taken:** crop → `/api/look` "is this the driver?"
-   - `false` → **instantly** in the browser: ✕, next seat, redraw, voice announcement. Then event `seat_taken` (actor `Code("camera")`) and `reroute` (actor `Agent("claude-eyes")`) to the job. If fewer than 2 seats remain, the job re-plans.
-   - `true` → event `landed` → job `landed`. *"Great landing."*
+The phone is **held**, not on a stand, so seats are pinned to directions in the room. iPhone Safari has no WebXR/ARKit, so pinning uses the phone's orientation sensors (rotation) plus the live detector (to correct drift as you walk).
+
+1. **Aim:** live camera, the on-device detector outlines what it thinks are seats (chairs, couches, benches).
+2. **Scan (1.5 s, hold still):** detector boxes are merged into candidates; a snapshot with **numbered boxes** goes to `/api/look` (mode `seats`). **Claude Opus 5.5** says which numbers are real seats, which are taken (person or belongings), and adds clear seats the detector missed. If Claude fails, the detector's guesses are used and the screen says so.
+3. **Pin:** each seat becomes an anchor `{yaw, pitch}` from the scan-time camera direction and the box position (`anchors.ts`). Distance in steps from the chair's apparent height.
+4. **Guide:** "Find me a spot" → closest free seats A, B, C. Every frame, anchors are projected to the screen from the current orientation; when the live detector sees a chair near where an anchor should be, the anchor snaps toward it (blend 0.35) and its steps update. Snake path from the bottom of the screen to A, faded on to B; when A is off screen, an edge arrow points to it ("turn left / right / behind you").
+5. **Occupancy:** while a pinned seat is in view, a `person` box covering ≥ 30% of its lower half for ≥ 1 s marks it taken; free after 2 s without.
+6. **Target taken:** "Was that you?" → **That's me** (Great landing) / **Someone else** (reroute to the next free seat, re-planned from what's free now). While walking, the person can also tap **I'm seated** or **It's taken**. Claude's identity check replaces the question in a later batch.
 
 ### 6.2 Park my car: the 2-second reroute
 
@@ -193,7 +199,8 @@ Notes:
 | D6 | Time-critical work (reroute, photo check) stays in the browser and Next.js; Anbaric records it after | Anbaric updates are queued, and the speed promise can't depend on a queue | Routing every reroute through the job queue |
 | D7 | **Clerk removed**; no driver login in the demo | Not needed; was a deploy risk (pages break without its keys) | Keeping Clerk alongside Anbaric |
 | D8 | **Base44** for the waitlist | No-code, built by the founder in parallel; live traction in the demo | Building a waitlist in our app |
-| D9 | Fixed phone on a stand; seat positions locked after a 2 s scan | Occupancy becomes a simple overlap test | Hand-held phone (the camera can't see you sit) |
+| D9 | Handheld phone; seats pinned to room directions (orientation sensors) and snapped to live detections | The person walks with the phone; iPhone web has no AR, this is the reliable middle ground | Fixed stand (founder tested handheld: screen-locked boxes broke as soon as the phone moved); photo-map (founder chose live view + arrow) |
+| D15 | Claude checks every scan through numbered boxes ("set of marks") | The small detector over-counts chairs in busy rooms (bags, laptops, people); Claude is accurate and only runs once per scan | Detector only; Claude finding boxes from scratch (less precise boxes) |
 | D10 | Driver identified by clothing description, no faces, nothing stored | Enough to tell two people apart on stage; privacy-safe | Face recognition |
 | D11 | Distance as steps from the chair's size in the picture | Good enough (±30%) for "about six steps" | WebXR depth (not on iOS Safari) |
 | D12 | Closest-first chain in the browser is always ready as a fallback | The demo never depends on one provider or the engine | Claude-only planning |

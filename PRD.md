@@ -106,7 +106,8 @@ Build the thinnest working version of **both modes**, end to end, today:
 | Frontend | **Next.js on Netlify** (camera, map, voice). Its server routes stay thin: get a short-lived voice key, run the photo check, pass calls through to the Anbaric app. |
 | Login | **None in the demo. Clerk removed.** The Anbaric console has its own login for us. |
 | Waitlist | **Base44** page behind a QR code |
-| Park me camera | iPhone **on a fixed stand** near the door, rear camera facing the room. Fixed means chairs don't move in the picture, which keeps detection simple. |
+| Park me camera | **Handheld.** You scan the room, Plan A and B stay pinned to the real chairs as you walk (phone motion sensors + live detection), and an arrow points to A when it's off screen. Decided 2026-10-11 after the first iPhone test. |
+| Seat accuracy | The phone's fast detector proposes boxes; **Claude checks each scan** (real seat? taken?) so bags, laptops and tables aren't counted as chairs. |
 | Who is "me" in Park me | At the start you stand in front of the camera; Claude notes your **clothing** (e.g. "black hoodie, white sneakers"). **No face recognition**, nothing stored. |
 | Distance to a chair | Estimated from how big the chair looks in the picture. Rough (±30%), so shown as **steps** ("about six steps") plus left/right/ahead. |
 | Car parking data | **Fake data**: 12 real SF garages with made-up availability and rules |

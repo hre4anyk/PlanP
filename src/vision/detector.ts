@@ -1,7 +1,7 @@
 import type { Box } from "@/logic/seats";
 import type { WorkerRequest, WorkerResponse } from "./detector-worker";
 
-export type Frame = { seats: Box[]; people: Box[]; timestamp: number; inferenceMs: number };
+export type Frame = { seats: Box[]; people: Box[]; vehicles: Box[]; timestamp: number; inferenceMs: number };
 export type Delegate = "GPU" | "CPU";
 
 const START_TIMEOUT_MS = 30_000;
