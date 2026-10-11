@@ -14,6 +14,7 @@ import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { RoutePlanBar } from "@/components/route-plan-bar";
 import { SpotList } from "@/components/spot-list";
+import { ArrivalPopup } from "@/components/arrival-popup";
 import { appleMapsUrl, googleMapsUrl } from "@/logic/maps";
 import { cn } from "@/lib/utils";
 
@@ -69,8 +70,11 @@ export function CarApp() {
   const [journey, setJourney] = useState<Journey>({ status: "idle" });
   const [frameIndex, setFrameIndex] = useState(0);
   const [parked, setParked] = useState(false);
+  const [arrivalShown, setArrivalShown] = useState(false);
 
   const journeyRequest = useRef<AbortController | null>(null);
+  const occupiedRef = useRef<() => void>(() => {});
+  const arrivalShownRef = useRef(false);
   useEffect(() => () => journeyRequest.current?.abort(), []);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -79,6 +83,12 @@ export function CarApp() {
   useEffect(() => {
     panelRef.current?.scrollTo({ top: 0 });
   }, [trip?.currentIndex, trip?.chain.length]);
+
+  // Reset the arrival popup when the plan changes.
+  useEffect(() => {
+    setArrivalShown(false);
+    arrivalShownRef.current = false;
+  }, [trip?.currentIndex]);
 
   const lots = useMemo(() => withFullLots(LOTS, trip?.fullIds ?? []), [trip?.fullIds]);
 
@@ -173,6 +183,27 @@ export function CarApp() {
     const target = lotById.get(next.chain[next.currentIndex].id)!;
     void planJourney(destination, from, target);
   }
+  occupiedRef.current = occupied;
+
+  // When the drive playback reaches the last photo, show the arrival popup and
+  // auto-advance to the next plan if the curb verdict is red or occupied.
+  const lastFrame = journey.status === "ready" ? journey.frames[journey.frames.length - 1] : null;
+  const nextPlanLabel = trip?.chain[trip.currentIndex + 1]?.label ?? null;
+  const frameCount = journey.status === "ready" ? journey.frames.length : 0;
+
+  useEffect(() => {
+    if (journey.status !== "ready" || !trip || !lastFrame) return;
+    if (frameIndex !== frameCount - 1 || arrivalShownRef.current) return;
+    arrivalShownRef.current = true;
+    setArrivalShown(true);
+    if (lastFrame.status === "free_to_park") {
+      setParked(true);
+    } else if (nextPlanLabel) {
+      const timer = setTimeout(() => occupiedRef.current(), 3500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameIndex, journey.status, frameCount, trip?.currentIndex, lastFrame?.status, nextPlanLabel]);
 
   function chooseDestination(place: Place) {
     setDestination(place);
@@ -260,6 +291,9 @@ export function CarApp() {
             Approximate route
           </span>
         )}
+        {journey.status === "ready" && arrivalShown && lastFrame && (
+          <ArrivalPopup frame={lastFrame} nextPlanLabel={nextPlanLabel} />
+        )}
       </div>
 
       <aside
@@ -309,28 +343,16 @@ export function CarApp() {
               {arrivalLine && <p className={cn(journey.status === "ready" ? "text-sm" : "text-base", late ? "font-semibold text-destructive" : "text-muted-foreground")}>{arrivalLine}</p>}
               {journey.status === "ready" && !trip.exhausted && !parked && (() => {
                 const target = trip.chain[trip.currentIndex] ? lotById.get(trip.chain[trip.currentIndex].id)! : destination;
-                return (
-                  <>
-                    <div className="flex gap-2 pt-1">
-                      <button type="button" onClick={() => setParked(true)} className="rounded-md bg-success px-3 py-1 text-sm font-bold text-black">
-                        Garage {trip.chain[trip.currentIndex]?.label} is Free
-                      </button>
-                      <button type="button" onClick={occupied} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
-                        Occupied →
-                      </button>
-                    </div>
-                    {target && (
-                      <div className="flex gap-3 pt-1.5">
-                        <a href={appleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
-                          Apple Maps →
-                        </a>
-                        <a href={googleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
-                          Google Maps →
-                        </a>
-                      </div>
-                    )}
-                  </>
-                );
+                return target ? (
+                  <div className="flex gap-3 pt-1.5">
+                    <a href={appleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                      Apple Maps →
+                    </a>
+                    <a href={googleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                      Google Maps →
+                    </a>
+                  </div>
+                ) : null;
               })()}
               {journey.status !== "ready" && !parked && (() => {
                 const target = trip.chain[trip.currentIndex] ? lotById.get(trip.chain[trip.currentIndex].id)! : destination;
@@ -494,29 +516,6 @@ export function CarApp() {
           )}
         </div>
 
-        {trip && !trip.exhausted && journey.status !== "ready" && !parked && (
-          <div className="border-t border-border p-4 sm:p-5">
-            <p className="mb-2 text-center text-sm text-muted-foreground">
-              Arrived at Garage {trip.chain[trip.currentIndex]?.label}?
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setParked(true)}
-                className="h-16 flex-1 rounded-xl bg-success text-xl font-bold text-black transition-transform active:scale-[0.98]"
-              >
-                Free
-              </button>
-              <button
-                type="button"
-                onClick={occupied}
-                className="h-16 flex-1 rounded-xl bg-destructive text-xl font-bold text-white transition-transform active:scale-[0.98]"
-              >
-                Occupied
-              </button>
-            </div>
-          </div>
-        )}
         {trip && parked && (
           <div className="border-t border-border p-4 sm:p-5">
             <div className="flex h-16 items-center justify-center rounded-xl bg-success/15 text-lg font-bold text-success">
