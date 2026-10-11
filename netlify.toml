@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Next.js 16 needs Node 20.9+; pinned so builds don't depend on Netlify's default.
+  NODE_VERSION = "22"
+
+# Declared explicitly: this site was created before the repo had a Next.js app,
+# so Netlify never auto-enabled the adapter and deployed 0 server functions.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
