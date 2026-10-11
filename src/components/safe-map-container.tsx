@@ -2,7 +2,7 @@
 
 import { LeafletContext, createLeafletContext } from "@react-leaflet/core";
 import { Map as LeafletMap } from "leaflet";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 type Props = {
   center: [number, number];
@@ -29,28 +29,23 @@ export function SafeMapContainer({ center, zoom, className, children, ...options
   const containerRef = useRef<HTMLDivElement>(null);
   const [ctx, setCtx] = useState<ReturnType<typeof createLeafletContext> | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    // Clear any stale Leaflet id from a previous (removed) instance.
+    // Clear any stale DOM and Leaflet state from a previous instance.
+    el.innerHTML = "";
     const elAny = el as unknown as { _leaflet_id?: number };
     if (elAny._leaflet_id) delete elAny._leaflet_id;
 
     const map = new LeafletMap(el, options);
     map.setView(center, zoom);
-
-    // Defer rendering children until the next frame so the map's DOM is laid
-    // out before TileLayer tries to append tiles.  In Strict Mode the first
-    // effect is cleaned up before the frame fires — the rAF is cancelled so
-    // children never render against a map that is about to be removed.
-    const rafId = requestAnimationFrame(() => {
-      map.invalidateSize();
-      setCtx(createLeafletContext(map));
-    });
+    map.invalidateSize();
+    setCtx(createLeafletContext(map));
 
     return () => {
-      cancelAnimationFrame(rafId);
+      // Remove all layers first so their cleanups don't touch a removed map.
+      map.eachLayer((layer) => map.removeLayer(layer));
       map.remove();
       setCtx(null);
     };
