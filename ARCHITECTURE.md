@@ -41,6 +41,7 @@ src/
     models.ts                (S2) model IDs and list prices, one place
     founder.ts               (S3) founder context from idea.md for the coach
   data/lots.ts               12 fake SF garages + preset places
+  data/poc-route.json        the demo route (S2b): path, photo IDs, headings, Claude's verdicts; built by scripts/build-poc-route.mts
   logic/
     geo.ts                   distances, walk minutes (80 m/min)
     chain.ts                 garage ranking (walk to meeting), A/B/C, extension
@@ -82,6 +83,8 @@ type CurbPoint = LatLng & {
 
 **S2 — the street journey (main view):** "Plan my parking" also fetches the drive straight to the meeting; `stretch.ts` samples a point every ~50 m along its last 10 minutes' walk (max 16). `/api/curb`: Street View metadata per point (free) → one photo per panorama, looking ahead and 25° right (how a driver glances at the curb) → Claude reads them in batches of 6, in parallel → per photo `{ allowed, kind, reason, box }`. The main area switches from the map to `StreetJourney`: the photo fills the screen, the judged curb outlined green/red/amber, "4 min walk to your meeting", the photo's date, ◀ ▶ / swipe and ▶ Drive auto-play; a minimap in the corner follows the photo. The panel lists the green stretches (tap to jump) and the trace (photos, seconds, cost). Founder choices: drive-through photos (not interactive 360°), minimap, right-hand curb only.
 
+**S2b — the demo route:** 995 Market St → 2 S Park St is precomputed once (route, a photo every 40 m along the whole drive, Claude's verdicts; $0.63 one-off) into `poc-route.json`. When the trip matches it, the journey appears instantly and auto-plays (0.7 s per photo while driving, 1.2 s in the parking zone, next 4 photos preloaded). Only photo IDs and verdicts are stored; images always come live through `/api/streetview/photo`. Verdicts show only within a 10-minute walk of the meeting; before that the view says "Driving". The demo starts at Frontier Tower; "Use my location" switches to GPS for live trips.
+
 **S3 — copilot:** short-lived key → WebRTC voice session → it asks where/when (`set_destination` → S1 flow), who you're meeting (`research_investor` → Claude + web search), then coaches with likely questions using `founder.ts`.
 
 ## 6. Fallbacks
@@ -121,4 +124,5 @@ One branch and pull request per sub-batch (PRD §5); Prelint reviews it; the fou
 | D5 | Garage chain A/B/C stays as Plan B | If no street space is free, the backup is already routed |
 | D6 | Free OSM stack for map, routing, geocoding; Google only for Street View | Fewer keys and costs; Google's photos are the one thing we can't get elsewhere |
 | D8 | Street View is the main view (drive-through photos), the map is a minimap | Founder: "it must be a street view as a human sees the street, not a 2D map" |
+| D9 | One precomputed demo route, iPhone first | Founder: keep it simple, one POC route that never fails on stage; more routes later |
 | D7 | Next.js on Netlify; Anbaric for the trip record (S5); Base44 waitlist; Prelint reviews | Reuse what works; sponsors where they add value |

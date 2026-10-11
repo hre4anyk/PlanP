@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StreetJourney, type CurbFrame } from "@/components/street-journey";
+import { PARKING_ZONE_WALK_MIN, StreetJourney, type CurbFrame } from "@/components/street-journey";
+import poc from "@/data/poc-route.json";
 import { Button } from "@/components/ui/button";
 import { DEMO_START, LOTS, MEETING_PLACES, formatClearance, type LatLng } from "@/data/lots";
 import { nearestOpenLot } from "@/logic/chain";
@@ -25,9 +26,15 @@ type Place = LatLng & { name: string };
 type Journey =
   | { status: "idle" }
   | { status: "loading"; points: number }
-  | { status: "ready"; frames: CurbFrame[]; route: Route; trace: { ms: number; photos: number; costUsd: number } }
+  | { status: "ready"; frames: CurbFrame[]; route: Route; trace: { ms: number; photos: number; costUsd: number; precomputed?: boolean } }
   | { status: "unavailable"; message: string };
-type StartState = "finding" | "gps" | "fallback";
+type StartState = "finding" | "gps" | "fallback" | "poc";
+
+// The demo route (PRD S2b): built once by scripts/build-poc-route.mts, instant and free to replay.
+const POC_START: LatLng = { lat: poc.start.lat, lng: poc.start.lng };
+const POC_MEETING: Place = { name: "2 S Park St · VC meeting", lat: poc.meeting.lat, lng: poc.meeting.lng };
+const isPocTrip = (start: LatLng, dest: LatLng) =>
+  start.lat === POC_START.lat && start.lng === POC_START.lng && dest.lat === POC_MEETING.lat && dest.lng === POC_MEETING.lng;
 
 /** "Heading to Plan B: Sutter-Stockton Garage. 3 min drive, 4 min walk." */
 function headingMessage(trip: Trip, route: Route | null, rerouted: boolean, destination: Place): string {
@@ -45,14 +52,14 @@ function headingMessage(trip: Trip, route: Route | null, rerouted: boolean, dest
 }
 
 export function CarApp() {
-  const [destination, setDestination] = useState<Place | null>(null);
-  const [query, setQuery] = useState("");
+  const [destination, setDestination] = useState<Place | null>(POC_MEETING);
+  const [query, setQuery] = useState("2 S Park St");
   const [results, setResults] = useState<Place[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [meetingTime, setMeetingTime] = useState("");
-  const [start, setStart] = useState<LatLng>(DEMO_START);
-  const [startState, setStartState] = useState<StartState>("finding");
+  const [start, setStart] = useState<LatLng>(POC_START);
+  const [startState, setStartState] = useState<StartState>("poc");
   const [trip, setTrip] = useState<Trip | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
   const [routedAt, setRoutedAt] = useState<Date | null>(null);
@@ -68,21 +75,22 @@ export function CarApp() {
 
   const lots = useMemo(() => withFullLots(LOTS, trip?.fullIds ?? []), [trip?.fullIds]);
 
-  // Find the driver right away (PRD S1). iPhone asks for permission the first time.
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      void Promise.resolve().then(() => setStartState("fallback"));
-      return;
-    }
+  /** Real GPS start (the demo starts at Frontier Tower; this is for trips beyond the demo route). */
+  function useMyLocation() {
+    if (!navigator.geolocation) return setStartState("fallback");
+    setStartState("finding");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setStart({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setStartState("gps");
       },
-      () => setStartState("fallback"),
+      () => {
+        setStart(DEMO_START);
+        setStartState("fallback");
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
     );
-  }, []);
+  }
 
   // One driving route: Start → A → B → C… through the garage chain, or straight to the meeting
   // when no garage is in walking range. Refetched whenever the chain grows.
@@ -110,6 +118,16 @@ export function CarApp() {
 
   /** S2: the drive straight to the meeting → Street View photos of its last stretch → Claude's verdicts. */
   async function planJourney(dest: Place) {
+    if (isPocTrip(start, dest)) {
+      setFrameIndex(0);
+      setJourney({
+        status: "ready",
+        frames: poc.frames as CurbFrame[],
+        route: { legs: [{ path: poc.path, driveMin: poc.driveMin }], approximate: false },
+        trace: { ms: 0, photos: poc.frames.length, costUsd: poc.buildCostUsd, precomputed: true },
+      });
+      return;
+    }
     const direct = await fetchRoute([start, dest]);
     const points = sampleStretch(direct.legs.flatMap((l) => l.path), dest);
     if (!points.length) {
@@ -182,6 +200,7 @@ export function CarApp() {
             frames={journey.frames}
             index={frameIndex}
             onIndex={setFrameIndex}
+            autoStart
             minimap={
               <MapView
                 lots={lots}
@@ -247,15 +266,15 @@ export function CarApp() {
           )}
 
           {journey.status === "ready" && (() => {
-            const green = journey.frames.map((f, i) => ({ f, i })).filter(({ f }) => f.allowed === "yes");
+            const green = journey.frames.map((f, i) => ({ f, i })).filter(({ f }) => f.allowed === "yes" && f.walkMin <= PARKING_ZONE_WALK_MIN);
             const closest = green.reduce<number | null>((m, { f }) => (m === null || f.walkMin < m ? f.walkMin : m), null);
             return (
               <div className="order-1 flex flex-col gap-2">
                 <span className="eyebrow">Street parking on your way</span>
                 <p className="text-sm">
                   {green.length
-                    ? `${green.length} of ${journey.frames.length} stretches allow parking${closest !== null ? `, the closest ${closest} min walk from the door` : ""}. Garage A is your backup.`
-                    : `No legal street parking in ${journey.frames.length} photos. Head straight for Garage A.`}
+                    ? `${green.length} stretches within a ${PARKING_ZONE_WALK_MIN}-minute walk allow parking${closest !== null ? `, the closest ${closest} min from the door` : ""}. Garage A is your backup.`
+                    : `No legal street parking within a ${PARKING_ZONE_WALK_MIN}-minute walk. Head straight for Garage A.`}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {green.map(({ f, i }) => (
@@ -270,7 +289,8 @@ export function CarApp() {
                   ))}
                 </div>
                 <span className="font-mono text-xs text-subtle">
-                  Claude + Street View · {journey.trace.photos} photos · {(journey.trace.ms / 1000).toFixed(1)} s · ${journey.trace.costUsd.toFixed(2)}
+                  Claude + Street View · {journey.trace.photos} photos ·{" "}
+                  {journey.trace.precomputed ? `read once, $${journey.trace.costUsd.toFixed(2)}` : `${(journey.trace.ms / 1000).toFixed(1)} s · $${journey.trace.costUsd.toFixed(2)}`}
                 </span>
               </div>
             );
@@ -339,9 +359,22 @@ export function CarApp() {
 
               <div className="flex flex-col gap-1">
                 <span className="eyebrow">Starting from</span>
-                <span className="text-base">
-                  {startState === "finding" ? "Finding you…" : startState === "gps" ? "Your location" : `${DEMO_START.name} (location unavailable)`}
-                </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-base">
+                    {startState === "poc"
+                      ? "995 Market St (Frontier Tower)"
+                      : startState === "finding"
+                        ? "Finding you…"
+                        : startState === "gps"
+                          ? "Your location"
+                          : `${DEMO_START.name} (location unavailable)`}
+                  </span>
+                  {startState === "poc" && (
+                    <Button variant="ghost" size="sm" onClick={useMyLocation}>
+                      Use my location
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <Button

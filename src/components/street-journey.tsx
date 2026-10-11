@@ -17,7 +17,11 @@ export type CurbFrame = {
   box: { x: number; y: number; w: number; h: number } | null;
 };
 
-const AUTOPLAY_MS = 2600;
+/** Drive quickly to the parking zone, then slow down where the verdicts matter. */
+const AUTOPLAY_MS = { driving: 700, zone: 1200 };
+/** Parking verdicts only matter within this walk of the meeting; before that you're just driving. */
+export const PARKING_ZONE_WALK_MIN = 10;
+const PRELOAD_AHEAD = 4;
 
 const TONE = {
   yes: { border: "border-success", fill: "bg-success/20", chip: "bg-success text-black", title: "Street parking" },
@@ -41,15 +45,18 @@ export function StreetJourney({
   index,
   onIndex,
   minimap,
+  autoStart = false,
 }: {
   frames: CurbFrame[];
   index: number;
   onIndex: (i: number) => void;
   minimap?: React.ReactNode;
+  autoStart?: boolean;
 }) {
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlaying] = useState(autoStart);
   const touchX = useRef<number | null>(null);
   const frame = frames[index];
+  const inZone = frame.walkMin <= PARKING_ZONE_WALK_MIN;
   const tone = TONE[frame.allowed];
 
   useEffect(() => {
@@ -58,9 +65,9 @@ export function StreetJourney({
       const stop = setTimeout(() => setPlaying(false), 0);
       return () => clearTimeout(stop);
     }
-    const next = setTimeout(() => onIndex(index + 1), AUTOPLAY_MS);
+    const next = setTimeout(() => onIndex(index + 1), frames[index].walkMin <= PARKING_ZONE_WALK_MIN ? AUTOPLAY_MS.zone : AUTOPLAY_MS.driving);
     return () => clearTimeout(next);
-  }, [playing, index, frames.length, onIndex]);
+  }, [playing, index, frames, onIndex]);
 
   const go = (i: number) => onIndex(Math.max(0, Math.min(frames.length - 1, i)));
 
@@ -79,12 +86,19 @@ export function StreetJourney({
       <div className="relative w-full shrink-0" style={{ aspectRatio: "16 / 10" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- proxied Street View photo, sized by the frame */}
         <img key={frame.photoUrl} src={frame.photoUrl} alt={`Street View, ${tone.title.toLowerCase()}: ${frame.kind}`} className="absolute inset-0 h-full w-full object-cover" />
-        {frame.box && (
+        {inZone && frame.box && (
           <div
             className={cn("absolute rounded-md border-4 border-dashed", tone.border, tone.fill)}
             style={{ left: `${frame.box.x * 100}%`, top: `${frame.box.y * 100}%`, width: `${frame.box.w * 100}%`, height: `${frame.box.h * 100}%` }}
           />
         )}
+        {/* Load the next photos ahead so the drive never stalls on a slow connection. */}
+        <div className="hidden" aria-hidden>
+          {frames.slice(index + 1, index + 1 + PRELOAD_AHEAD).map((f) => (
+            // eslint-disable-next-line @next/next/no-img-element -- preloading proxied photos
+            <img key={f.photoUrl} src={f.photoUrl} alt="" />
+          ))}
+        </div>
         <span className="absolute top-2 left-2 rounded-md bg-black/65 px-2 py-0.5 font-mono text-[11px] text-white/80">
           {index + 1}/{frames.length} · Street View {photoDate(frame.date)}
         </span>
@@ -95,12 +109,24 @@ export function StreetJourney({
 
       {/* The verdict, under the photo, big enough to read at a glance */}
       <div className="flex flex-col gap-1 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("rounded-md px-2.5 py-0.5 text-sm font-bold", tone.chip)}>{tone.title}</span>
-          <span className="text-base font-medium text-white">{frame.kind}</span>
-          <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk</span>
-        </div>
-        <p className="text-sm leading-snug text-white/70">{frame.reason}</p>
+        {inZone ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn("rounded-md px-2.5 py-0.5 text-sm font-bold", tone.chip)}>{tone.title}</span>
+              <span className="text-base font-medium text-white">{frame.kind}</span>
+              <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk</span>
+            </div>
+            <p className="text-sm leading-snug text-white/70">{frame.reason}</p>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-white/15 px-2.5 py-0.5 text-sm font-bold text-white">Driving</span>
+              <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk from the meeting</span>
+            </div>
+            <p className="text-sm leading-snug text-white/70">Parking check starts {PARKING_ZONE_WALK_MIN} minutes&apos; walk from the door.</p>
+          </>
+        )}
 
         <div className="flex items-center gap-2 pt-1.5">
           <button type="button" aria-label="Previous photo" onClick={() => go(index - 1)} disabled={index === 0} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
@@ -119,22 +145,23 @@ export function StreetJourney({
           <button type="button" aria-label="Next photo" onClick={() => go(index + 1)} disabled={index === frames.length - 1} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
             ›
           </button>
-          {/* Progress: one dot per photo, coloured by verdict */}
-          <div className="ml-auto flex flex-wrap justify-end gap-1">
-            {frames.map((f, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={`Photo ${i + 1}`}
-                onClick={() => go(i)}
-                className={cn(
-                  "h-2.5 w-2.5 rounded-full",
-                  f.allowed === "yes" ? "bg-success" : f.allowed === "no" ? "bg-destructive" : "bg-amber-400",
-                  i === index ? "ring-2 ring-white" : "opacity-70",
-                )}
-              />
-            ))}
-          </div>
+        </div>
+
+        {/* The whole drive as one bar: grey while driving, then green/red/amber per photo. Tap to jump. */}
+        <div className="flex h-3 w-full gap-px overflow-hidden rounded-full pt-0" role="group" aria-label="Photos along the drive">
+          {frames.map((f, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Photo ${i + 1}`}
+              onClick={() => go(i)}
+              className={cn(
+                "h-full flex-1",
+                f.walkMin > PARKING_ZONE_WALK_MIN ? "bg-white/25" : f.allowed === "yes" ? "bg-success" : f.allowed === "no" ? "bg-destructive/80" : "bg-amber-400",
+                i === index ? "outline-2 outline-white" : i > index && "opacity-50",
+              )}
+            />
+          ))}
         </div>
       </div>
     </div>
