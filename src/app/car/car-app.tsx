@@ -221,8 +221,8 @@ export function CarApp() {
   }
 
   /**
-   * Score an answer: queue it for the Anbaric engine and poll for Claude's score; after 9 s without
-   * one, ask Claude directly (ARCHITECTURE S4). Every request stays short.
+   * Score an answer: queue it for the Anbaric engine and poll for Claude's score (usually 5–8 s);
+   * after 13 s without one, ask Claude directly (ARCHITECTURE S4). Every request stays short.
    */
   async function scoreViaEngine(n: number, answer: string): Promise<{ ok: boolean; data: Omit<Scored, "n"> }> {
     const post = (direct: boolean) =>
@@ -235,7 +235,7 @@ export function CarApp() {
     const queued = first.ok ? await first.json() : null;
     if (queued && !queued.queued) return { ok: true, data: queued }; // scored directly (no queue here)
     if (queued?.queued) {
-      const deadline = Date.now() + 9000;
+      const deadline = Date.now() + 13000;
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 600));
         const poll = await fetch(`/api/coach/result?id=${queued.queued}`).catch(() => null);
