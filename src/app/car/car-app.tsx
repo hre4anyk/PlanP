@@ -270,7 +270,7 @@ export function CarApp() {
                 </div>
               )}
               {journey.status === "ready" && parked && (
-                <p className="pt-1 text-sm font-semibold text-success">Parked! You're all set.</p>
+                <p className="pt-1 text-sm font-semibold text-success">Parked! You&apos;re all set.</p>
               )}
             </div>
           )}
@@ -474,7 +474,7 @@ export function CarApp() {
         {trip && parked && (
           <div className="border-t border-border p-4 sm:p-5">
             <div className="flex h-16 items-center justify-center rounded-xl bg-success/15 text-lg font-bold text-success">
-              ✓ Parked — you've arrived!
+              ✓ Parked — you&apos;ve arrived!
             </div>
           </div>
         )}
