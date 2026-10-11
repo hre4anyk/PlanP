@@ -47,7 +47,10 @@ src/                         Next.js app (Netlify)
     chain.test.ts
     seats.ts                 room scan, chair IDs, free/taken with debounce, steps + direction
     seats.test.ts
-    route.ts                 OSRM call with 5 s timeout → straight-line fallback
+    route.ts                 OSRM call with 5 s timeout → straight-line fallback (one path + drive minutes per leg)
+    route.test.ts
+    trip.ts                  car trip in the browser: start, "Lot is full" → next plan, grow chain, full lots for the map
+    trip.test.ts
   vision/
     detector.ts              MediaPipe object detector wrapper (load once, detect per frame)
     frame.ts                 grab a JPEG from the video, cropped to one chair

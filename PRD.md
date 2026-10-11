@@ -232,7 +232,7 @@ you sit in Plan B ──► detector ──► Claude (photo): driver? yes ─�
 - **Done when:** the current segment is clearly different from the backups.
 
 **F10. "Lot is full" and chain extension**
-- Big red button at the bottom (at least 64 px tall) and the voice command. Reroute happens instantly from the existing chain (< 2 seconds); Claude's re-plan updates the rest in the background. No lots left → add the next 3 (D, E, F).
+- Big red button at the bottom (at least 64 px tall) and the voice command. Reroute happens instantly from the existing chain (< 2 seconds); Claude's re-plan updates the rest in the background. When fewer than 2 plans are left ahead, add the next 3 (D, E, F), so there is always a backup.
 - **Done when:** repeated "full" walks A → B → C → D… without errors.
 
 **F11. Open in Apple Maps / Google Maps**

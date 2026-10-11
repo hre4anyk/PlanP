@@ -2,9 +2,11 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { formatClearance, SF_CENTER, type LatLng, type Lot } from "@/data/lots";
 import type { ChainItem } from "@/logic/chain";
+import type { Route } from "@/logic/route";
 
 type Props = {
   lots: Lot[];
@@ -12,8 +14,14 @@ type Props = {
   currentIndex: number;
   destination: LatLng;
   start: LatLng;
+  route: Route | null;
   onPickDestination: (point: LatLng) => void;
 };
+
+const DRIVEN = { color: "#3a3a44", weight: 7, opacity: 1 };
+const CURRENT = { color: "#ff4d2e", weight: 9, opacity: 1 };
+const FLOW = { color: "#0a0a0f", weight: 3, opacity: 0.55, dashArray: "6 12", className: "route-flow" };
+const BACKUP = { color: "#ff4d2e", weight: 7, opacity: 0.25 };
 
 // Pins are plain HTML (styled in globals.css) so we don't depend on Leaflet's image markers.
 const pin = (className: string, html = "", size = 28) =>
@@ -28,12 +36,40 @@ function lotIcon(lot: Lot, item: ChainItem | undefined, isCurrent: boolean) {
   return pin(isCurrent ? "pin-plan pin-current" : "pin-plan", item.label, 32);
 }
 
+/** Keep the whole snake in view whenever a new route arrives. */
+function FitRoute({ route }: { route: Route | null }) {
+  const map = useMap();
+  useEffect(() => {
+    const points = route?.legs.flatMap((leg) => leg.path) ?? [];
+    if (points.length > 1) map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng])), { padding: [40, 40], maxZoom: 16 });
+  }, [map, route]);
+  return null;
+}
+
+/** Driven legs grey, the current leg bright with a flowing dash, backups faded (PRD F9). */
+function Snake({ route, currentIndex }: { route: Route; currentIndex: number }) {
+  return (
+    <>
+      {route.legs.map((leg, i) => {
+        const positions = leg.path.map((p) => [p.lat, p.lng] as [number, number]);
+        if (i === currentIndex) {
+          return [
+            <Polyline key={`${i}-current`} positions={positions} pathOptions={CURRENT} />,
+            <Polyline key={`${i}-flow`} positions={positions} pathOptions={FLOW} />,
+          ];
+        }
+        return <Polyline key={i} positions={positions} pathOptions={i < currentIndex ? DRIVEN : BACKUP} />;
+      })}
+    </>
+  );
+}
+
 function TapToChoose({ onPick }: { onPick: (point: LatLng) => void }) {
   useMapEvents({ click: (e) => onPick({ lat: e.latlng.lat, lng: e.latlng.lng }) });
   return null;
 }
 
-export default function MapView({ lots, chain, currentIndex, destination, start, onPickDestination }: Props) {
+export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination }: Props) {
   return (
     <MapContainer
       center={[SF_CENTER.lat, SF_CENTER.lng]}
@@ -48,6 +84,8 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
         maxZoom={19}
       />
       <TapToChoose onPick={onPickDestination} />
+      <FitRoute route={route} />
+      {route && <Snake route={route} currentIndex={currentIndex} />}
 
       {lots.map((lot) => {
         const index = chain.findIndex((c) => c.id === lot.id);
