@@ -81,6 +81,7 @@ export function CarApp() {
   const [answered, setAnswered] = useState(0);
   const [scoring, setScoring] = useState(false);
   const [pitch, setPitch] = useState<Pitch | null>(null);
+  const [muted, setMuted] = useState(false);
   const copilotRef = useRef<VoiceCopilot | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const tripRef = useRef("");
@@ -325,6 +326,7 @@ export function CarApp() {
   async function startCopilot() {
     copilotRef.current?.stop();
     setLines([]);
+    setMuted(false);
     const copilot = new VoiceCopilot({
       onState: (state, detail) => {
         setCopilotState(state);
@@ -447,11 +449,24 @@ export function CarApp() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2 text-sm font-medium">
                     <span className={cn("size-2.5 rounded-full", copilotState === "live" ? "animate-pulse bg-success" : "bg-amber-400")} />
-                    {copilotState === "connecting" ? "Connecting…" : scoring ? "Claude is scoring your pitch…" : copilotState === "working" ? "Working on it…" : "Listening"}
+                    {copilotState === "connecting" ? "Connecting…" : muted ? "Mic off · tap to answer" : scoring ? "Claude is scoring your pitch…" : copilotState === "working" ? "Working on it…" : "Listening"}
                   </span>
-                  <Button variant="ghost" size="sm" onClick={() => copilotRef.current?.stop()}>
-                    End
-                  </Button>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant={muted ? "default" : "outline"}
+                      size="sm"
+                      aria-pressed={muted}
+                      onClick={() => {
+                        copilotRef.current?.setMuted(!muted);
+                        setMuted(!muted);
+                      }}
+                    >
+                      {muted ? "🔇 Mic off" : "🎙 Mic on"}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => copilotRef.current?.stop()}>
+                      End
+                    </Button>
+                  </div>
                 </div>
                 {lines.slice(-2).map((l, i) => (
                   <p key={i} className={cn("text-sm leading-snug", l.who === "you" ? "text-muted-foreground" : "text-foreground")}>

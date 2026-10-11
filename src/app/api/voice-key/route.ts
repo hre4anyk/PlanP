@@ -80,7 +80,12 @@ export async function POST() {
         model: VOICE_MODEL,
         instructions: INSTRUCTIONS,
         audio: {
-          input: { transcription: { model: "gpt-4o-mini-transcribe" } },
+          // A noisy room: filter the noise and wait for a finished sentence before answering.
+          input: {
+            transcription: { model: "gpt-4o-mini-transcribe" },
+            noise_reduction: { type: "far_field" },
+            turn_detection: { type: "semantic_vad", eagerness: "low" },
+          },
           output: { voice: "marin" },
         },
         tools: TOOLS,

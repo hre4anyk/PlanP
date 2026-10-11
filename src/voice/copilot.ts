@@ -97,6 +97,11 @@ export class VoiceCopilot {
     this.send({ type: "response.create" });
   }
 
+  /** Mic off: the track sends silence, so room noise can't interrupt her. She keeps talking. */
+  setMuted(muted: boolean) {
+    this.mic?.getAudioTracks().forEach((t) => (t.enabled = !muted));
+  }
+
   get live() {
     return this.dc?.readyState === "open";
   }
