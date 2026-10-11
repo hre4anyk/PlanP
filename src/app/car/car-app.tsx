@@ -15,6 +15,7 @@ import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/tri
 import { RoutePlanBar } from "@/components/route-plan-bar";
 import { SpotList } from "@/components/spot-list";
 import { ArrivalPopup } from "@/components/arrival-popup";
+import { Fundy } from "@/components/fundy";
 import { appleMapsUrl, googleMapsUrl } from "@/logic/maps";
 import { cn } from "@/lib/utils";
 
@@ -299,7 +300,7 @@ export function CarApp() {
       <aside
         className={cn(
           "flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l",
-          journey.status === "ready" ? "max-h-[30dvh]" : "max-h-[55dvh]",
+          journey.status === "ready" ? "max-h-[45dvh]" : "max-h-[55dvh]",
         )}
       >
         <div ref={panelRef} className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", journey.status === "ready" ? "gap-3 p-4" : "gap-5 p-5 sm:p-6")}>
@@ -384,6 +385,8 @@ export function CarApp() {
             </>
           )}
           {journey.status === "unavailable" && <p className="text-sm text-muted-foreground">Street View: {journey.message}</p>}
+
+          {journey.status === "ready" && <Fundy />}
 
           {!planning && (
             <>
