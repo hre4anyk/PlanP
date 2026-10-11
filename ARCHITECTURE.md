@@ -33,7 +33,8 @@ src/
     car/page.tsx             the app (map + panel)
     car/car-app.tsx          GPS start, address search, meeting time, route, garage chain, arrival estimate
     api/geocode/route.ts     address → SF places (Nominatim, identifying User-Agent)
-    api/curb/route.ts        (S2) route → Street View photos → Claude → parking allowed/not per point
+    api/curb/route.ts        (S2) stretch points → Street View metadata + photos → Claude (batches of 6) → verdict per photo
+    api/streetview/photo/route.ts  (S2) photo proxy so the Google key never reaches the browser
     api/voice-key/route.ts   (S3) short-lived OpenAI Realtime key
     api/research/route.ts    (S3) Claude + web search: investor brief + likely questions
   ai/
@@ -46,9 +47,11 @@ src/
     trip.ts                  "Lot is full" → next plan, grow the chain
     route.ts                 OSRM route with per-leg paths and drive minutes; straight-line fallback
     eta.ts                   arrival at the door vs meeting time
+    stretch.ts               (S2) points every ~50 m along the last 10 min walk, with driving bearing
     *.test.ts                Vitest
   components/
-    map-view.tsx             Leaflet map: garages, route snake, meeting flag, you
+    map-view.tsx             Leaflet map: garages, route snake, meeting flag, you; follows the current photo as a minimap
+    street-journey.tsx       (S2) the main view: Street View photos in driving order, Claude's curb box + verdict, ▶ Drive
 ```
 
 ## 3. Data shapes
@@ -77,7 +80,7 @@ type CurbPoint = LatLng & {
 
 **S1 — route:** GPS position on load (fallback: Fell & Van Ness, said on screen) → address search (`/api/geocode`, SF only) → optional meeting time → "Plan my parking" → garage chain A/B/C by walk to the meeting → OSRM route Start → A → B → C (or straight to the meeting if no garage is within 15 min walk) → status card: "Heading to Plan A… 10 min drive, 3 min walk. At the door 13:40, 20 min spare."
 
-**S2 — street parking layer:** take the route's last ~10 minutes' walk around the meeting; sample a point every ~60 m; for each, Street View metadata (free) → if a photo exists, the Static API image facing the right-hand curb → Claude reads a batch of photos and says whether parking is allowed there and why → green/red markers with walk minutes to the meeting; tap for the photo, the reason and the photo date. Results cached per point.
+**S2 — the street journey (main view):** "Plan my parking" also fetches the drive straight to the meeting; `stretch.ts` samples a point every ~50 m along its last 10 minutes' walk (max 16). `/api/curb`: Street View metadata per point (free) → one photo per panorama, looking ahead and 25° right (how a driver glances at the curb) → Claude reads them in batches of 6, in parallel → per photo `{ allowed, kind, reason, box }`. The main area switches from the map to `StreetJourney`: the photo fills the screen, the judged curb outlined green/red/amber, "4 min walk to your meeting", the photo's date, ◀ ▶ / swipe and ▶ Drive auto-play; a minimap in the corner follows the photo. The panel lists the green stretches (tap to jump) and the trace (photos, seconds, cost). Founder choices: drive-through photos (not interactive 360°), minimap, right-hand curb only.
 
 **S3 — copilot:** short-lived key → WebRTC voice session → it asks where/when (`set_destination` → S1 flow), who you're meeting (`research_investor` → Claude + web search), then coaches with likely questions using `founder.ts`.
 
@@ -117,4 +120,5 @@ One branch and pull request per sub-batch (PRD §5); Prelint reviews it; the fou
 | D4 | Two AI models: Claude Opus 5.5 (eyes + research), OpenAI Realtime (voice) | Each the best at its job; the voice calls Claude as a tool |
 | D5 | Garage chain A/B/C stays as Plan B | If no street space is free, the backup is already routed |
 | D6 | Free OSM stack for map, routing, geocoding; Google only for Street View | Fewer keys and costs; Google's photos are the one thing we can't get elsewhere |
+| D8 | Street View is the main view (drive-through photos), the map is a minimap | Founder: "it must be a street view as a human sees the street, not a 2D map" |
 | D7 | Next.js on Netlify; Anbaric for the trip record (S5); Base44 waitlist; Prelint reviews | Reuse what works; sponsors where they add value |

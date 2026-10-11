@@ -16,6 +16,8 @@ type Props = {
   start: LatLng;
   route: Route | null;
   onPickDestination: (point: LatLng) => void;
+  /** The Street View photo being shown: marked and kept in view (minimap). */
+  focus?: LatLng | null;
 };
 
 const DRIVEN = { color: "#3a3a44", weight: 7, opacity: 1 };
@@ -71,7 +73,18 @@ function TapToChoose({ onPick }: { onPick: (point: LatLng) => void }) {
   return null;
 }
 
-export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination }: Props) {
+/** Follow the Street View photo being shown. */
+function FollowFocus({ focus }: { focus: LatLng | null | undefined }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focus) map.setView([focus.lat, focus.lng], 17, { animate: true });
+  }, [map, focus]);
+  return null;
+}
+
+const FOCUS = pin("pin-current", "", 18);
+
+export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination, focus }: Props) {
   return (
     <MapContainer
       center={[SF_CENTER.lat, SF_CENTER.lng]}
@@ -86,7 +99,8 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
         maxZoom={19}
       />
       <TapToChoose onPick={onPickDestination} />
-      <FitRoute route={route} start={start} destination={destination} />
+      {focus ? <FollowFocus focus={focus} /> : <FitRoute route={route} start={start} destination={destination} />}
+      {focus && <Marker position={[focus.lat, focus.lng]} icon={FOCUS} zIndexOffset={2000} />}
       {route && <Snake route={route} currentIndex={currentIndex} />}
 
       {lots.map((lot) => {

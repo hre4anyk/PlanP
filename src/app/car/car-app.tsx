@@ -2,12 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { StreetJourney, type CurbFrame } from "@/components/street-journey";
 import { Button } from "@/components/ui/button";
 import { DEMO_START, LOTS, MEETING_PLACES, formatClearance, type LatLng } from "@/data/lots";
 import { nearestOpenLot } from "@/logic/chain";
 import { arrival, clock, meetingAt, spareText } from "@/logic/eta";
 import { walkMinutes } from "@/logic/geo";
 import { fetchRoute, type Route } from "@/logic/route";
+import { sampleStretch } from "@/logic/stretch";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +22,11 @@ const MapView = dynamic(() => import("@/components/map-view"), {
 const lotById = new Map(LOTS.map((lot) => [lot.id, lot]));
 
 type Place = LatLng & { name: string };
+type Journey =
+  | { status: "idle" }
+  | { status: "loading"; points: number }
+  | { status: "ready"; frames: CurbFrame[]; route: Route; trace: { ms: number; photos: number; costUsd: number } }
+  | { status: "unavailable"; message: string };
 type StartState = "finding" | "gps" | "fallback";
 
 /** "Heading to Plan B: Sutter-Stockton Garage. 3 min drive, 4 min walk." */
@@ -49,6 +56,8 @@ export function CarApp() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
   const [routedAt, setRoutedAt] = useState<Date | null>(null);
+  const [journey, setJourney] = useState<Journey>({ status: "idle" });
+  const [frameIndex, setFrameIndex] = useState(0);
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Show the status card from the top whenever the plan changes.
@@ -92,6 +101,35 @@ export function CarApp() {
   function reset() {
     setTrip(null);
     setRoute(null);
+    setJourney({ status: "idle" });
+    setFrameIndex(0);
+  }
+
+  /** S2: the drive straight to the meeting → Street View photos of its last stretch → Claude's verdicts. */
+  async function planJourney(dest: Place) {
+    const direct = await fetchRoute([start, dest]);
+    const points = sampleStretch(direct.legs.flatMap((l) => l.path), dest);
+    if (!points.length) {
+      setJourney({ status: "unavailable", message: "You're already within a short walk of the meeting." });
+      return;
+    }
+    setJourney({ status: "loading", points: points.length });
+    try {
+      const res = await fetch("/api/curb", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ points }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (!data.frames.length) throw new Error("No Street View photos along this stretch.");
+      setFrameIndex(0);
+      setJourney({ status: "ready", frames: data.frames, route: direct, trace: data.trace });
+    } catch (err) {
+      setJourney({ status: "unavailable", message: err instanceof Error ? err.message : "Street View is unavailable." });
+    }
+  }
+
+  function plan() {
+    if (!destination) return;
+    setTrip(startTrip(destination, LOTS));
+    void planJourney(destination);
   }
 
   function chooseDestination(place: Place) {
@@ -136,6 +174,25 @@ export function CarApp() {
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col lg:flex-row">
       <div className="relative min-h-0 flex-1">
+        {journey.status === "ready" ? (
+          <StreetJourney
+            frames={journey.frames}
+            index={frameIndex}
+            onIndex={setFrameIndex}
+            minimap={
+              <MapView
+                lots={lots}
+                chain={[]}
+                currentIndex={0}
+                destination={destination}
+                start={start}
+                route={journey.route}
+                onPickDestination={() => {}}
+                focus={journey.frames[frameIndex]}
+              />
+            }
+          />
+        ) : (
         <MapView
           lots={lots}
           chain={trip?.chain ?? []}
@@ -145,7 +202,13 @@ export function CarApp() {
           route={route}
           onPickDestination={(point) => chooseDestination({ ...point, name: "Point on the map" })}
         />
-        {route?.approximate && (
+        )}
+        {journey.status === "loading" && (
+          <span className="absolute inset-x-4 top-4 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
+            Claude is reading {journey.points} Street View photos along your last 10 minutes…
+          </span>
+        )}
+        {journey.status !== "ready" && route?.approximate && (
           <span className="absolute top-3 left-3 z-[1000] rounded-md bg-background/80 px-2.5 py-1 text-xs text-muted-foreground">
             Approximate route
           </span>
@@ -167,6 +230,37 @@ export function CarApp() {
               {arrivalLine && <p className={cn("text-base", late ? "font-semibold text-destructive" : "text-muted-foreground")}>{arrivalLine}</p>}
             </div>
           )}
+
+          {journey.status === "ready" && (() => {
+            const green = journey.frames.map((f, i) => ({ f, i })).filter(({ f }) => f.allowed === "yes");
+            const closest = green.reduce<number | null>((m, { f }) => (m === null || f.walkMin < m ? f.walkMin : m), null);
+            return (
+              <div className="flex flex-col gap-2">
+                <span className="eyebrow">Street parking on your way</span>
+                <p className="text-base">
+                  {green.length
+                    ? `${green.length} of ${journey.frames.length} stretches allow parking${closest !== null ? `, the closest ${closest} min walk from the door` : ""}. Garage A is your backup.`
+                    : `No legal street parking in ${journey.frames.length} photos. Head straight for Garage A.`}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {green.map(({ f, i }) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setFrameIndex(i)}
+                      className={cn("rounded-full border px-3 py-1.5 text-xs", i === frameIndex ? "border-success text-foreground" : "border-success/40 text-muted-foreground")}
+                    >
+                      {f.walkMin} min walk · {f.kind}
+                    </button>
+                  ))}
+                </div>
+                <span className="font-mono text-xs text-subtle">
+                  Claude + Street View · {journey.trace.photos} photos · {(journey.trace.ms / 1000).toFixed(1)} s · ${journey.trace.costUsd.toFixed(2)}
+                </span>
+              </div>
+            );
+          })()}
+          {journey.status === "unavailable" && <p className="text-sm text-muted-foreground">Street View: {journey.message}</p>}
 
           {!planning && (
             <>
@@ -239,7 +333,7 @@ export function CarApp() {
                 size="lg"
                 className="h-14 text-lg"
                 disabled={!destination}
-                onClick={() => destination && setTrip(startTrip(destination, LOTS))}
+                onClick={plan}
               >
                 {destination ? "Plan my parking" : "Choose where you're going"}
               </Button>
