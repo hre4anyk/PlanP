@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PARKING_ZONE_WALK_MIN, StreetJourney, type CurbFrame } from "@/components/street-journey";
 import poc from "@/data/poc-route.json";
 import { Button } from "@/components/ui/button";
-import { DEMO_START, LOTS, MEETING_PLACES, formatClearance, type LatLng } from "@/data/lots";
+import { DEMO_START, LOTS, formatClearance, type LatLng } from "@/data/lots";
 import { nearestOpenLot } from "@/logic/chain";
 import { arrival, clock, meetingAt, spareText } from "@/logic/eta";
 import { distanceMetres, walkDistanceText, walkMinutes } from "@/logic/geo";
@@ -381,22 +381,7 @@ export function CarApp() {
                     ))}
                   </ul>
                 )}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {MEETING_PLACES.slice(0, 2).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => chooseDestination(p)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs",
-                        destination?.name === p.name ? "border-primary text-foreground" : "border-input text-muted-foreground",
-                      )}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-                {destination && <p className="text-sm">Meeting at: <span className="font-medium">{destination.name}</span></p>}
+
               </form>
 
               <div className="flex items-center justify-between gap-3">
