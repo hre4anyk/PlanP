@@ -14,6 +14,7 @@ import { sampleStretch } from "@/logic/stretch";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { cn } from "@/lib/utils";
 import { VoiceCopilot, type CopilotState } from "@/voice/copilot";
+import { PITCH_QUESTIONS } from "@/ai/questions";
 
 // Leaflet touches `window`, so the map only renders in the browser.
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -30,7 +31,7 @@ type Journey =
   | { status: "ready"; frames: CurbFrame[]; route: Route; trace: { ms: number; photos: number; costUsd: number; precomputed?: boolean } }
   | { status: "unavailable"; message: string };
 type StartState = "finding" | "gps" | "fallback" | "poc";
-type Brief = { who: string; focus: string; angle: string; questions: string[]; watchOut: string };
+type Scored = { n: number; score: number; strong: string; fix: string; via: string };
 type Line = { who: "you" | "copilot"; text: string };
 
 /** The demo meeting, however he says it: "2 South Park", "South Park Street", "2 S Park St"… */
@@ -73,36 +74,47 @@ export function CarApp() {
   const [frameIndex, setFrameIndex] = useState(0);
   const [parked, setParked] = useState(false);
 
-  // S3: the voice copilot and the agents it calls.
+  // S4: the voice copilot. The conversation is the clock: each scored answer drives one stretch.
   const [copilotState, setCopilotState] = useState<CopilotState>("off");
   const [copilotDetail, setCopilotDetail] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
-  const [brief, setBrief] = useState<Brief | null>(null);
+  const [scores, setScores] = useState<Scored[]>([]);
+  const [arrived, setArrived] = useState(false);
   const copilotRef = useRef<VoiceCopilot | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const lastAlertRef = useRef(0);
-  // Tool handlers outlive renders, so they read the latest trip state through refs.
-  const live = useRef({ journey, trip, destination });
+  const driveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tripRef = useRef("");
+  // Tool handlers outlive renders, so they read the latest state through refs.
+  const live = useRef({ journey, scores });
   useEffect(() => {
-    live.current = { journey, trip, destination };
-  }, [journey, trip, destination]);
-  useEffect(() => () => copilotRef.current?.stop(), []);
-  const frameIndexRef = useRef(0);
+    live.current = { journey, scores };
+  }, [journey, scores]);
+  useEffect(
+    () => () => {
+      copilotRef.current?.stop();
+      if (driveTimer.current) clearInterval(driveTimer.current);
+    },
+    [],
+  );
 
-  // Live parking alerts during the drive: the copilot says it when a free stretch comes up.
-  useEffect(() => {
-    frameIndexRef.current = frameIndex;
-    const copilot = copilotRef.current;
-    if (!copilot?.live || journey.status !== "ready") return;
-    const f = journey.frames[frameIndex];
-    const now = Date.now();
-    if (frameIndex === journey.frames.length - 1) {
-      copilot.say("[Plan P app] He has reached the meeting block. Remind him of the best parking he passed and wish him luck.");
-    } else if (f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN && now - lastAlertRef.current > 12000) {
-      lastAlertRef.current = now;
-      copilot.say(`[Plan P app] Free street parking on his right right now: ${f.kind}, ${f.walkMin} minutes' walk to the meeting.`);
-    }
-  }, [frameIndex, journey]);
+  /** Drive the photos forward to `target`, one every 450 ms (a stretch takes a few seconds). */
+  function driveTo(target: number) {
+    if (driveTimer.current) clearInterval(driveTimer.current);
+    driveTimer.current = setInterval(() => {
+      setFrameIndex((i) => {
+        if (i >= target) {
+          if (driveTimer.current) clearInterval(driveTimer.current);
+          return i;
+        }
+        return i + 1;
+      });
+    }, 450);
+  }
+
+  /** Where stretch k (1–6) of the drive ends. */
+  function stretchEnd(k: number, frameCount: number) {
+    return Math.round((Math.min(k, PITCH_QUESTIONS.length) / PITCH_QUESTIONS.length) * (frameCount - 1));
+  }
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Show the status card from the top whenever the plan changes.
@@ -224,46 +236,62 @@ export function CarApp() {
         dest = data.results[0];
       }
       planFor(dest, time);
-      const garage = startTrip(dest, LOTS).chain[0];
-      const garageName = garage ? lotById.get(garage.id)!.name : null;
+      setScores([]);
+      setArrived(false);
+      tripRef.current = crypto.randomUUID();
+      void fetch("/api/trip", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ event: "start", tripRef: tripRef.current, destination: dest.name, meetingTime: time }),
+      });
       if (dest === POC_MEETING) {
+        // Pull away while the coach asks the first question.
+        setTimeout(() => driveTo(stretchEnd(1, poc.frames.length)), 1500);
         const spots = freeSpots(poc.frames as CurbFrame[]);
         const now = new Date();
         const a = arrival(now, poc.driveMin, spots[0]?.walkMin ?? 0, time ? meetingAt(time, now) : null);
-        return [
-          `Route set from Frontier Tower to 2 South Park Street: about ${poc.driveMin} minutes' drive.`,
-          spots.length ? `${spots.length} stretches with free street parking near the meeting, the closest ${spots[0].walkMin} minutes' walk (${spots[0].kind}).` : "No free street parking seen near the meeting.",
-          garageName ? `Garage backup: ${garageName}.` : "",
-          `At the door around ${clock(a.atDoor)}${a.spareMin !== null ? `, ${spareText(a.spareMin)}` : ""}.`,
-        ].join(" ");
+        return `Route set from Frontier Tower to 2 South Park Street: about ${poc.driveMin} minutes' drive, at the door around ${clock(a.atDoor)}${a.spareMin !== null ? `, ${spareText(a.spareMin)}` : ""}. Parking near the meeting is marked on screen. Now ask Question 1.`;
       }
-      return `Route set to ${dest.name}. I'm reading Street View along the last stretch for parking now; it takes about 10 seconds.${garageName ? ` Garage backup: ${garageName}.` : ""}`;
+      return `Route set to ${dest.name}. Street parking along the last stretch will appear on screen in about 10 seconds. Now ask Question 1.`;
     },
-    research_investor: async (args: Record<string, unknown>) => {
-      const res = await fetch("/api/research", {
+    score_answer: async (args: Record<string, unknown>) => {
+      const n = Math.max(1, Math.min(PITCH_QUESTIONS.length, Number(args.question_number) || 1));
+      const res = await fetch("/api/coach", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: String(args.name ?? ""), firm: args.firm ? String(args.firm) : undefined }),
+        body: JSON.stringify({ tripRef: tripRef.current, questionNumber: n, answer: String(args.answer ?? "") || "(no answer)" }),
       });
       const data = await res.json();
-      if (!res.ok) return `Research didn't work (${data.error}). Coach him with tough general defense-VC questions instead.`;
-      setBrief(data.brief);
-      return JSON.stringify(data.brief);
-    },
-    parking_options: async () => {
-      const { journey: j, trip: t } = live.current;
-      const garage = t?.chain[t.currentIndex];
-      const garageText = garage ? ` Garage backup: ${lotById.get(garage.id)!.name}, ${garage.distance}.` : "";
-      if (j.status !== "ready") return `The parking check isn't ready yet.${garageText}`;
-      const spots = freeSpots(j.frames).slice(0, 3);
-      if (!spots.length) return `No free street parking within a ${PARKING_ZONE_WALK_MIN}-minute walk.${garageText}`;
-      return `Free street parking: ${spots.map((f) => `${f.kind}, ${f.walkMin} min walk`).join("; ")}.${garageText}`;
+      // The car moves on whatever the score: the conversation sets the pace.
+      const { journey: j } = live.current;
+      if (j.status === "ready") driveTo(stretchEnd(n + 1, j.frames.length));
+      if (!res.ok) return `Scoring didn't work this time. Give him one honest sentence of feedback yourself, then ask Question ${n + 1}.`;
+      const all = [...live.current.scores.filter((x) => x.n !== n), { n, score: data.score, strong: data.strong, fix: data.fix, via: data.via }];
+      setScores(all);
+      if (n < PITCH_QUESTIONS.length) {
+        return JSON.stringify({ score: data.score, strong: data.strong, fix: data.fix, next_question_number: n + 1, next_question: PITCH_QUESTIONS[n] });
+      }
+      const average = Math.round((all.reduce((t, x) => t + x.score, 0) / all.length) * 10) / 10;
+      const spots = j.status === "ready" ? freeSpots(j.frames) : [];
+      setArrived(true);
+      void fetch("/api/trip", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ event: "arrived", tripRef: tripRef.current, averageScore: average }),
+      });
+      return JSON.stringify({
+        score: data.score,
+        strong: data.strong,
+        fix: data.fix,
+        arrived: true,
+        average_score: average,
+        weakest_question: all.reduce((w, x) => (x.score < w.score ? x : w)).n,
+        closest_free_parking: spots[0] ? `${spots[0].kind}, ${spots[0].walkMin} minutes' walk` : "none seen; use the garage backup",
+      });
     },
     i_parked: async () => {
       setParked(true);
-      const { journey: j } = live.current;
-      const walk = j.status === "ready" ? j.frames[Math.min(frameIndexRef.current, j.frames.length - 1)].walkMin : null;
-      return walk !== null ? `Parked. About ${walk} minutes' walk to the meeting.` : "Parked.";
+      return "Parked. Wish him luck.";
     },
   };
 
@@ -329,7 +357,8 @@ export function CarApp() {
             frames={journey.frames}
             index={frameIndex}
             onIndex={setFrameIndex}
-            autoStart
+            autoStart={copilotState === "off" || copilotState === "error"}
+            paced={copilotState !== "off" && copilotState !== "error"}
             minimap={
               <MapView
                 lots={lots}
@@ -354,6 +383,25 @@ export function CarApp() {
           onPickDestination={(point) => chooseDestination({ ...point, name: "Point on the map" })}
         />
         )}
+        {/* Phase banner: what the drive and the conversation are doing right now */}
+        {(() => {
+          const voiceOn = copilotState !== "off" && copilotState !== "error";
+          const last = scores[scores.length - 1];
+          const average = scores.length ? Math.round((scores.reduce((t, x) => t + x.score, 0) / scores.length) * 10) / 10 : null;
+          let text = "";
+          if (arrived) text = `Arrived · South Park · pitch average ${average}/10 · parking marked`;
+          else if (voiceOn && journey.status === "ready") text = `Driving · Question ${Math.min(scores.length + 1, PITCH_QUESTIONS.length)} of ${PITCH_QUESTIONS.length}`;
+          else if (voiceOn) text = "Tell Plan P where you're going";
+          if (!text) return null;
+          return (
+            <div className="pointer-events-none absolute inset-x-2 top-9 z-[1000] flex justify-start pr-24 sm:top-12">
+              <span className={cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold shadow-lg", arrived ? "bg-success text-black" : "bg-primary text-primary-foreground")}>
+                {text}
+                {last && !arrived && <span className="rounded bg-black/25 px-1.5 font-mono text-xs">Q{last.n} {last.score}/10</span>}
+              </span>
+            </div>
+          );
+        })()}
         {journey.status === "loading" && (
           <span className="absolute inset-x-4 top-4 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
             Claude is reading {journey.points} Street View photos along your last 10 minutes…
@@ -393,8 +441,8 @@ export function CarApp() {
                     {copilotState === "connecting"
                       ? "Connecting…"
                       : copilotState === "working"
-                        ? copilotDetail.includes("research")
-                          ? "Claude is researching your investor…"
+                        ? copilotDetail.includes("score")
+                          ? "Claude is scoring your answer…"
                           : "Working on it…"
                         : "Listening"}
                   </span>
@@ -410,20 +458,20 @@ export function CarApp() {
                 ))}
               </>
             )}
-            {brief && (
-              <details className="text-sm">
-                <summary className="cursor-pointer font-medium">Investor brief (Claude, live web search)</summary>
-                <div className="flex flex-col gap-1.5 pt-2 text-muted-foreground">
-                  <p>{brief.who}</p>
-                  <p><span className="text-foreground">Angle:</span> {brief.angle}</p>
-                  <ol className="list-decimal pl-5">
-                    {brief.questions.map((q, i) => (
-                      <li key={i}>{q}</li>
-                    ))}
-                  </ol>
-                  <p><span className="text-foreground">Watch out:</span> {brief.watchOut}</p>
-                </div>
-              </details>
+            {scores.length > 0 && (
+              <ol className="flex flex-col gap-1 text-sm">
+                {scores.map((x) => (
+                  <li key={x.n} className="flex gap-2">
+                    <span className={cn("w-12 shrink-0 font-mono font-bold", x.score >= 7 ? "text-success" : x.score >= 5 ? "text-amber-400" : "text-destructive")}>
+                      Q{x.n} {x.score}
+                    </span>
+                    <span className="text-muted-foreground">{x.fix}</span>
+                  </li>
+                ))}
+                <li className="pt-1 font-mono text-xs text-subtle">
+                  Scored by Claude {scores.some((x) => x.via === "anbaric") ? "as an Anbaric agent (audited)" : "directly"}
+                </li>
+              </ol>
             )}
           </div>
 

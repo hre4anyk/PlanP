@@ -1,23 +1,26 @@
 import { VOICE_MODEL } from "@/ai/models";
 import { FOUNDER_CONTEXT } from "@/ai/founder";
+import { PITCH_QUESTIONS } from "@/ai/questions";
 
-// S3: a short-lived key for the browser's voice session (OpenAI Realtime over WebRTC). The real
+// S4: a short-lived key for the browser's voice session (OpenAI Realtime over WebRTC). The real
 // OpenAI key never leaves the server; the session's instructions and tools are fixed here.
+// The conversation is the clock: every scored answer moves the car one stretch (PRD S4).
 
 const INSTRUCTIONS = `You are Plan P, a calm, warm voice copilot in the car with a stressed founder driving to an investor meeting in San Francisco.
-You have two jobs: get him parked near the meeting on time, and prepare him for the pitch like a partner with 20 years of venture experience.
+Your job: set his route, then use the drive to sharpen his pitch with the six questions every fund asks.
+He is driving: keep replies short (two sentences, under 40 words). Never read lists aloud. Be encouraging but honest.
 
-He is driving: keep EVERY reply under 35 words, at most two short sentences. Never read lists aloud. Be encouraging but honest.
+Flow, in order:
+1. Greet him in one sentence and ask where the meeting is and what time. When you have it, call set_destination. If he isn't sure, use 2 South Park Street.
+2. Tell him the drive time from the tool result in one sentence, say parking near the meeting is marked on his screen, and that you'll use the drive for six questions investors always ask. Then ask Question 1.
+3. After he answers, call score_answer with the question number and his answer in his own words. The car moves forward when you do.
+4. From the tool result say the score out of 10 and one sentence combining what was strong and the fix. Then ask the next question it gives you, word for word.
+5. After the sixth answer, the tool result says he has arrived: give his average score, one final tip for the meeting, mention the closest free parking from the result, and wish him luck.
+6. If he says he parked, call i_parked.
+Ask only these questions, in this order, one at a time:
+${PITCH_QUESTIONS.map((q, i) => `Question ${i + 1}: ${q}`).join("\n")}
 
-Flow:
-1. Greet him in one sentence and ask where the meeting is and what time. When you have it, call set_destination. If he isn't sure, the default is 2 South Park Street.
-2. After the route is set, tell him the drive time and where street parking looks good, in one or two sentences.
-3. Ask who he's meeting and from which firm. Call research_investor, and tell him you're looking them up and it takes about 20 seconds. Until the brief arrives, do NOT invent investor questions; talk about the drive or ask what he's most nervous about.
-4. When the brief arrives, tell him in one sentence who they are and the angle that will land. Then coach: ask ONE likely question from the brief, wait for his answer, give feedback in two sentences (what was strong, one concrete fix), then the next question.
-5. Messages that start with "[Plan P app]" are live updates from the app (parking ahead, arrival). Relay the news in your own words in one short sentence (never say "Plan P app" or read the brackets), then continue coaching.
-6. When he says he parked or arrived, call i_parked, wish him luck, and give one last tip.
-
-Use parking_options if he asks where to park. Don't invent parking or investor facts: use the tools.
+Don't invent scores or parking: use the tools.
 
 ${FOUNDER_CONTEXT}`;
 
@@ -25,39 +28,33 @@ const TOOLS = [
   {
     type: "function",
     name: "set_destination",
-    description: "Set the meeting address (and time if known), plan the drive and street parking along the way.",
+    description: "Set the meeting address (and time if known); plans the route and the street parking near the meeting.",
     parameters: {
       type: "object",
       properties: {
         address: { type: "string", description: "Meeting address or place in San Francisco, e.g. '2 South Park Street'" },
-        meeting_time: { type: "string", description: "24-hour time HH:MM if he said one, e.g. '15:00'" },
+        meeting_time: { type: "string", description: "24-hour time HH:MM if he said one, e.g. '17:30'" },
       },
       required: ["address"],
     },
   },
   {
     type: "function",
-    name: "research_investor",
-    description: "Research the investor he's meeting on the web (about 20 seconds) and get likely questions.",
+    name: "score_answer",
+    description: "Score his answer to a pitch question (Claude does it, ~3 s). Moves the car one stretch and returns the next question.",
     parameters: {
       type: "object",
       properties: {
-        name: { type: "string", description: "The investor's name" },
-        firm: { type: "string", description: "Their firm, if he said it" },
+        question_number: { type: "integer", description: `1 to ${PITCH_QUESTIONS.length}` },
+        answer: { type: "string", description: "His answer, in his own words" },
       },
-      required: ["name"],
+      required: ["question_number", "answer"],
     },
   },
   {
     type: "function",
-    name: "parking_options",
-    description: "Where street parking is free near the meeting, with walking minutes, plus the garage backup.",
-    parameters: { type: "object", properties: {}, required: [] },
-  },
-  {
-    type: "function",
     name: "i_parked",
-    description: "He has parked. Marks the trip done and returns the walk to the meeting.",
+    description: "He has parked. Marks the trip done.",
     parameters: { type: "object", properties: {}, required: [] },
   },
 ];

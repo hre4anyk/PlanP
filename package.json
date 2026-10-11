@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
     "@base-ui/react": "^1.8.0",
+    "@netlify/blobs": "^11.1.4",
     "@stellar/stellar-sdk": "^17.1.0",
     "@supabase/supabase-js": "^2.117.2",
     "class-variance-authority": "^0.7.1",

@@ -46,12 +46,15 @@ export function StreetJourney({
   onIndex,
   minimap,
   autoStart = false,
+  paced = false,
 }: {
   frames: CurbFrame[];
   index: number;
   onIndex: (i: number) => void;
   minimap?: React.ReactNode;
   autoStart?: boolean;
+  /** The voice copilot moves the car (one stretch per answer): no ▶ Drive button. */
+  paced?: boolean;
 }) {
   const [playing, setPlaying] = useState(autoStart);
   const touchX = useRef<number | null>(null);
@@ -119,7 +122,7 @@ export function StreetJourney({
           <button type="button" aria-label="Previous photo" onClick={() => go(index - 1)} disabled={index === 0} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
             ‹
           </button>
-          <button
+          {!paced && <button
             type="button"
             onClick={() => {
               if (!playing && index >= frames.length - 1) onIndex(0);
@@ -128,7 +131,7 @@ export function StreetJourney({
             className="h-10 shrink-0 rounded-full bg-primary px-4 text-sm font-bold whitespace-nowrap text-primary-foreground"
           >
             {playing ? "❚❚ Pause" : "▶ Drive"}
-          </button>
+          </button>}
           <button type="button" aria-label="Next photo" onClick={() => go(index + 1)} disabled={index === frames.length - 1} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
             ›
           </button>
