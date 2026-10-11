@@ -7,6 +7,11 @@ import { getStore } from "@netlify/blobs";
 export type QueueKind = "trip_start" | "trip_arrived" | "answer";
 export type QueueItem = { id: string; kind: QueueKind; payload: Record<string, unknown>; createdAt: number };
 
+/** Never let a storage call hang a request (Netlify stops functions at ~30 s). */
+function withTimeout<T>(p: Promise<T>, ms = 4000): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("blob store timeout")), ms))]);
+}
+
 function store() {
   try {
     return getStore({ name: "planp-engine", consistency: "strong" });
@@ -20,7 +25,7 @@ export async function enqueue(kind: QueueKind, payload: Record<string, unknown>)
   if (!s || !process.env.ENGINE_TOKEN) return null;
   const item: QueueItem = { id: crypto.randomUUID(), kind, payload, createdAt: Date.now() };
   try {
-    await s.setJSON(`pending/${item.id}`, item);
+    await withTimeout(s.setJSON(`pending/${item.id}`, item));
     return item.id;
   } catch {
     return null;
@@ -31,34 +36,31 @@ export async function enqueue(kind: QueueKind, payload: Record<string, unknown>)
 export async function claimPending(max = 10): Promise<QueueItem[]> {
   const s = store();
   if (!s) return [];
-  const { blobs } = await s.list({ prefix: "pending/" });
+  const { blobs } = await withTimeout(s.list({ prefix: "pending/" }));
   const items: QueueItem[] = [];
   for (const blob of blobs.slice(0, max)) {
-    const item = (await s.get(blob.key, { type: "json" })) as QueueItem | null;
-    await s.delete(blob.key);
+    const item = (await withTimeout(s.get(blob.key, { type: "json" }))) as QueueItem | null;
+    await withTimeout(s.delete(blob.key));
     if (item) items.push(item);
   }
   return items.sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export async function complete(id: string, result: unknown) {
-  await store()?.setJSON(`result/${id}`, { result, at: Date.now() });
+  const s = store();
+  if (s) await withTimeout(s.setJSON(`result/${id}`, { result, at: Date.now() }));
 }
 
-/** Wait for the engine's result for an item, or null after the timeout. */
-export async function waitResult<T>(id: string, timeoutMs: number): Promise<T | null> {
+/** One quick look for the engine's result (the browser polls this; no request waits long). */
+export async function readResult<T>(id: string): Promise<T | null> {
   const s = store();
   if (!s) return null;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const found = (await s.get(`result/${id}`, { type: "json" })) as { result: T } | null;
-    if (found) {
-      await s.delete(`result/${id}`);
-      return found.result;
-    }
-    await new Promise((r) => setTimeout(r, 350));
+  try {
+    const found = (await withTimeout(s.get(`result/${id}`, { type: "json" }), 3000)) as { result: T } | null;
+    return found ? found.result : null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export function engineAuthorised(req: Request): boolean {

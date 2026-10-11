@@ -220,6 +220,34 @@ export function CarApp() {
     return frames.filter((f) => f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN).sort((a, b) => a.walkMin - b.walkMin);
   }
 
+  /**
+   * Score an answer: queue it for the Anbaric engine and poll for Claude's score; after 9 s without
+   * one, ask Claude directly (ARCHITECTURE S4). Every request stays short.
+   */
+  async function scoreViaEngine(n: number, answer: string): Promise<{ ok: boolean; data: Omit<Scored, "n"> }> {
+    const post = (direct: boolean) =>
+      fetch("/api/coach", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tripRef: tripRef.current, questionNumber: n, answer, direct }),
+      });
+    const first = await post(false);
+    const queued = first.ok ? await first.json() : null;
+    if (queued && !queued.queued) return { ok: true, data: queued }; // scored directly (no queue here)
+    if (queued?.queued) {
+      const deadline = Date.now() + 9000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 600));
+        const poll = await fetch(`/api/coach/result?id=${queued.queued}`).catch(() => null);
+        if (!poll?.ok) break;
+        const result = await poll.json();
+        if (!result.pending) return { ok: true, data: result };
+      }
+    }
+    const fallback = await post(true);
+    return { ok: fallback.ok, data: await fallback.json() };
+  }
+
   const tools = {
     set_destination: async (args: Record<string, unknown>) => {
       const address = String(args.address ?? "");
@@ -256,16 +284,11 @@ export function CarApp() {
     },
     score_answer: async (args: Record<string, unknown>) => {
       const n = Math.max(1, Math.min(PITCH_QUESTIONS.length, Number(args.question_number) || 1));
-      const res = await fetch("/api/coach", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tripRef: tripRef.current, questionNumber: n, answer: String(args.answer ?? "") || "(no answer)" }),
-      });
-      const data = await res.json();
+      const { ok, data } = await scoreViaEngine(n, String(args.answer ?? "") || "(no answer)");
       // The car moves on whatever the score: the conversation sets the pace.
       const { journey: j } = live.current;
       if (j.status === "ready") driveTo(stretchEnd(n + 1, j.frames.length));
-      if (!res.ok) return `Scoring didn't work this time. Give him one honest sentence of feedback yourself, then ask Question ${n + 1}.`;
+      if (!ok) return `Scoring didn't work this time. Give him one honest sentence of feedback yourself, then ask Question ${n + 1}.`;
       const all = [...live.current.scores.filter((x) => x.n !== n), { n, score: data.score, strong: data.strong, fix: data.fix, via: data.via }];
       setScores(all);
       if (n < PITCH_QUESTIONS.length) {

@@ -3,14 +3,15 @@ import { z } from "zod";
 import { BRAIN_MODEL, costUsd } from "@/ai/models";
 import { COACH_SCHEMA, COACH_SYSTEM, type CoachScore } from "@/ai/coach";
 import { PITCH_QUESTIONS } from "@/ai/questions";
-import { enqueue, waitResult } from "@/lib/engine-queue";
+import { enqueue } from "@/lib/engine-queue";
 
-// S4: score one spoken pitch answer. First choice: the Anbaric engine (Claude as an audited Anbaric
-// agent); if it doesn't answer in time, Claude directly, so the conversation never stalls.
+// S4: score one spoken pitch answer. First choice: queue it for the Anbaric engine (Claude as an
+// audited Anbaric agent) and return at once; the browser polls /api/coach/result. With `direct`
+// (or when there's no queue) Claude scores it here, so the conversation never stalls.
 
 const client = new Anthropic();
-const ENGINE_WAIT_MS = 9000;
 const Body = z.object({
+  direct: z.boolean().optional(),
   tripRef: z.string().max(100).optional(),
   questionNumber: z.number().int().min(1).max(PITCH_QUESTIONS.length),
   answer: z.string().min(1).max(4000),
@@ -31,16 +32,13 @@ async function scoreDirect(question: string, answer: string) {
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Bad request" }, { status: 400 });
-  const { tripRef, questionNumber, answer } = parsed.data;
+  const { tripRef, questionNumber, answer, direct } = parsed.data;
   const question = PITCH_QUESTIONS[questionNumber - 1];
   const started = Date.now();
 
-  const queued = await enqueue("answer", { tripRef, questionNumber, question, answer });
-  if (queued) {
-    const viaEngine = await waitResult<CoachScore & { jobId?: string; error?: string }>(queued, ENGINE_WAIT_MS);
-    if (viaEngine && !viaEngine.error) {
-      return Response.json({ ...viaEngine, question, via: "anbaric", ms: Date.now() - started });
-    }
+  if (!direct) {
+    const queued = await enqueue("answer", { tripRef, questionNumber, question, answer });
+    if (queued) return Response.json({ queued, question });
   }
   try {
     const direct = await scoreDirect(question, answer);
