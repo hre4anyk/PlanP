@@ -37,7 +37,7 @@ src/                         Next.js app (Netlify)
     page.tsx                 landing page (links to both modes + waitlist QR)
     me/page.tsx              Park me (camera), client-side
     car/page.tsx             Park my car: tabs for Street spot (camera) and Garage plan (map)
-    car/street-finder.tsx    dashboard camera, live vehicle boxes, Claude street checks
+    car/street-finder.tsx    Drive / Spotter views, tracked vehicles, measured gaps, Spot A/B/C, Claude checks
     car/car-modes.tsx        street first, garages as backup
     api/look/route.ts        Claude Opus 5.5 photo checks: describe driver, is-this-the-driver
     api/voice-key/route.ts   mint a short-lived OpenAI Realtime key
@@ -48,6 +48,8 @@ src/                         Next.js app (Netlify)
     chain.ts                 closest-first ranking + chain extension (fallback, both modes)
     chain.test.ts
     seats.ts                 room scan, chair IDs, free/taken with debounce, steps + direction
+    curb.ts                  vehicle tracking, parked cars, gaps in car lengths, stable Spot A/B/C, "taken" events
+    curb.test.ts
     anchors.ts               pin seats to room directions (phone orientation), project to screen, snap to live detections
     seats.test.ts
     route.ts                 OSRM call with 5 s timeout → straight-line fallback (one path + drive minutes per leg)
@@ -163,12 +165,16 @@ The phone is **held**, not on a stand, so seats are pinned to directions in the 
 5. **Occupancy:** while a pinned seat is in view, a `person` box covering ≥ 30% of its lower half for ≥ 1 s marks it taken; free after 2 s without.
 6. **Target taken:** "Was that you?" → **That's me** (Great landing) / **Someone else** (reroute to the next free seat, re-planned from what's free now). While walking, the person can also tap **I'm seated** or **It's taken**. Claude's identity check replaces the question in a later batch.
 
-### 6.2 Park my car: street spot from the dashboard
+### 6.2 Park my car: street spot from the camera
 
-1. "Start looking": rear camera + on-device detector; every vehicle (`car`, `truck`, `bus`, `motorcycle`) outlined live.
-2. Every ~6 s while looking (first look 1.5 s in), or on "Check now": a snapshot with the vehicles **numbered** goes to `/api/look` mode `street`. Claude Opus 5.5 returns which numbers are parked at the curb, whether there's an open space long enough for a car, where, how far, whether it's legal right now, and the rules it saw.
-3. Open (or possibly open) spot → dashed box + spoken "Open spot on your right, about 15 metres" → **Park here** / **Taken, keep looking**.
-4. No luck → **Garage plan** switches to the A/B/C garage chain (6.3).
+Two views, chosen on start: **Drive** (phone on the dashboard, moving) and **Spotter** (phone at a window or on a pole, watching one street; alerts the moment a spot opens).
+
+1. **Track** (`logic/curb.ts`, every frame, on the phone): vehicles (`car`, `truck`, `bus`, `motorcycle`) are matched frame to frame by IoU so each keeps an id.
+2. **Parked?** Claude's last verdict follows each car by id. In Spotter (fixed camera) a car that hasn't moved for 1.5 s also counts.
+3. **Gaps:** between neighbouring parked cars on the same curb (similar size; for elongated boxes the line between them runs along their long side), the gap is measured **in car lengths**, so it works at any distance or angle. 1.3–4 car lengths with nothing in it → a candidate spot, shown amber within ~0.5 s.
+4. **Spot chain:** spots keep their identity across frames and are labelled A, B, C: in Drive your side (right) first, then nearest. A car sitting in a shown spot for 0.8 s → "Spot A just got taken. Head to Spot B."
+5. **Claude confirms** (`/api/look` mode `street`): on every new gap (at most every 2.5 s) and as a heartbeat (Drive 8 s, Spotter 15 s), a snapshot with vehicles **numbered** and gaps **lettered** goes to Claude Opus 5.5. It returns which vehicles are parked, a verdict per lettered gap (legal → green ✓, illegal → dropped with the reason, e.g. "hydrant" or "travel lane"), extra open spaces it sees (including the ends of rows), rules seen, and a one-line summary. The prompt asks it to look at the space in front of and behind every parked car, on both curbs, from any viewpoint.
+6. **Park in A** / **Taken, next**; **Garage plan** hands off to the A/B/C garage chain (6.3).
 
 ### 6.3 Park my car: the 2-second garage reroute
 
@@ -209,7 +215,7 @@ The phone is **held**, not on a stand, so seats are pinned to directions in the 
 | D7 | **Clerk removed**; no driver login in the demo | Not needed; was a deploy risk (pages break without its keys) | Keeping Clerk alongside Anbaric |
 | D8 | **Base44** for the waitlist | No-code, built by the founder in parallel; live traction in the demo | Building a waitlist in our app |
 | D9 | Handheld phone; seats pinned to room directions (orientation sensors) and snapped to live detections | The person walks with the phone; iPhone web has no AR, this is the reliable middle ground | Fixed stand (founder tested handheld: screen-locked boxes broke as soon as the phone moved); photo-map (founder chose live view + arrow) |
-| D16 | Street parking first, garage chain as backup; Claude judges open + legal from a numbered snapshot every ~6 s | Cars are easy for the on-device model, legality (hydrants, curbs, signs) needs Claude; one story with the garage chain | Detector-only gap finding (can't judge legality); third-party feeds (none live and open today, see PRD) |
+| D16 | Street parking first, garage chain as backup; the phone measures gaps between parked cars instantly (in car lengths) and Claude confirms legality per gap | Founder test: a spot opened and was taken before a 6 s Claude-only loop said anything; gaps in front of/behind parked cars are where spots are | Cars are easy for the on-device model, legality (hydrants, curbs, signs) needs Claude; one story with the garage chain | Detector-only gap finding (can't judge legality); third-party feeds (none live and open today, see PRD) |
 | D15 | Claude checks every scan through numbered boxes ("set of marks") | The small detector over-counts chairs in busy rooms (bags, laptops, people); Claude is accurate and only runs once per scan | Detector only; Claude finding boxes from scratch (less precise boxes) |
 | D10 | Driver identified by clothing description, no faces, nothing stored | Enough to tell two people apart on stage; privacy-safe | Face recognition |
 | D11 | Distance as steps from the chair's size in the picture | Good enough (±30%) for "about six steps" | WebXR depth (not on iOS Safari) |

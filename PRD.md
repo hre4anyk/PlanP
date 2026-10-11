@@ -112,7 +112,7 @@ Build the thinnest working version of **both modes**, end to end, today:
 | Distance to a chair | Estimated from how big the chair looks in the picture. Rough (±30%), so shown as **steps** ("about six steps") plus left/right/ahead. |
 | Car parking data | **Fake data**: 12 real SF garages with made-up availability and rules |
 | How we know a lot is full (car) | **Voice** ("it's full") or the **big button** |
-| Street parking (car) | **Street first, garages as backup** (decided 2026-10-11). Phone on the dashboard: the on-device detector outlines vehicles live; every ~6 s (or "Check now") Claude looks at one frame with the vehicles numbered and says which are parked, whether there's an open curb space, and whether it's legal (hydrant, driveway, coloured curb, signs). No luck → one tap to the garage Plan A/B/C. |
+| Street parking (car) | **Street first, garages as backup** (decided 2026-10-11). Two views: **Drive** (dashboard) and **Spotter** (window/pole, alerts when a spot opens). The phone measures the gap in front of and behind every parked car **instantly**; gaps ≥ 1.3 car lengths become **Spot A, B, C** (your side first). Claude confirms each is legal (hydrant, driveway, curb colour, crosswalk, signs). If a car pulls into Spot A: "Spot A just got taken, head to Spot B". No luck → one tap to the garage Plan A/B/C. |
 | Third-party camera data | Researched 2026-10-11: Waymo publishes research datasets only (no live feed); Tesla's Fleet API has no camera access; **Nexar CityStream** offers live dashcam detections incl. free parking spaces (enterprise API). Not used today; Plan P's own phones are the camera network, Nexar is a partner option. |
 | Speed promise | Reroutes happen **instantly in the browser** from the chain already on screen. Claude's re-plan and the Anbaric record follow in the background. |
 | Map, routes | OpenStreetMap via Leaflet; OSRM public server. Free, no keys. |
@@ -312,9 +312,9 @@ Prices used: Claude Opus 5.5 $4 in / $20 out per 1M tokens. gpt-realtime-2.1-min
 | Step | Model | Usage | Cost |
 |---|---|---|---|
 | Vehicle detection | on-device detector | every frame | **$0** |
-| Street checks | Claude Opus 5.5 | ~30 looks × (~1.2k in incl. a small photo, ~200 out) | ~$0.26 |
+| Street checks | Claude Opus 5.5 | ~25 looks (one per new gap + an 8 s heartbeat) × (~1.2k in incl. a small photo, ~250 out) | ~$0.25 |
 
-Easy saving later: only send a frame when the detector sees a gap between parked cars, which cuts looks by most of that.
+Measured on the founder's test: ~$0.009 per look, ~3 s. Spotter mode's heartbeat is 15 s, so watching a street costs about $0.04 a minute.
 
 **Park me**: one 2-minute session.
 
