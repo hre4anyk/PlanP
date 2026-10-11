@@ -130,3 +130,94 @@
     opacity: 0.05;
   }
 }
+
+/* Map pins (Leaflet divIcons) and popups, in the Plan P palette. */
+.pin {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-family: var(--font-clash), sans-serif;
+  font-weight: 700;
+  line-height: 1;
+}
+.pin-lot {
+  background: #1c1c24;
+  border: 2px solid #6b6b75;
+  color: #a0a0a8;
+  font-size: 11px;
+}
+.pin-full {
+  background: #1c1c24;
+  border: 2px solid var(--destructive);
+  color: var(--destructive);
+  font-size: 12px;
+}
+.pin-plan {
+  background: var(--background);
+  border: 2px solid rgba(255, 77, 46, 0.5);
+  color: rgba(255, 77, 46, 0.8);
+  font-size: 15px;
+}
+.pin-current {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 6px rgba(255, 77, 46, 0.2);
+}
+.pin-flag {
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 18px;
+}
+.pin-car {
+  background: var(--background);
+  border: 3px solid var(--muted-foreground);
+  color: var(--muted-foreground);
+  font-size: 8px;
+}
+/* Standard OpenStreetMap tiles (free, no key), inverted to match the dark UI. */
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.4);
+}
+.leaflet-container {
+  background: var(--background);
+  font-family: var(--font-satoshi), sans-serif;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--popover);
+  color: var(--foreground);
+  border: 1px solid var(--input);
+}
+.leaflet-control-attribution {
+  background: rgba(10, 10, 15, 0.7) !important;
+  color: var(--subtle) !important;
+}
+.leaflet-control-attribution a {
+  color: var(--muted-foreground) !important;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--muted-foreground);
+}
+.lot-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.lot-popup strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+.lot-full {
+  color: var(--destructive);
+  font-weight: 600;
+}
+.lot-open {
+  color: var(--foreground);
+  font-weight: 600;
+}
