@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { formatClearance, SF_CENTER, type LatLng, type Lot } from "@/data/lots";
 import type { ChainItem } from "@/logic/chain";
@@ -85,9 +85,12 @@ function FollowFocus({ focus }: { focus: LatLng | null | undefined }) {
 const FOCUS = pin("pin-current", "", 18);
 
 export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination, focus }: Props) {
+  // Stable unique key per instance: prevents "Map container is being reused" when two MapViews
+  // coexist (main map + minimap), and avoids unnecessary remounts during Fast Refresh.
+  const id = useId();
   return (
     <MapContainer
-      key={focus ? "minimap" : "main"}
+      key={id}
       center={[SF_CENTER.lat, SF_CENTER.lng]}
       zoom={14}
       className="h-full w-full"
