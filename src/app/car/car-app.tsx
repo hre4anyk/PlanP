@@ -215,19 +215,31 @@ export function CarApp() {
         )}
       </div>
 
-      <aside className="flex max-h-[55dvh] shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l">
-        <div ref={panelRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
+      <aside
+        className={cn(
+          "flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l",
+          journey.status === "ready" ? "max-h-[30dvh]" : "max-h-[55dvh]",
+        )}
+      >
+        <div ref={panelRef} className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", journey.status === "ready" ? "gap-3 p-4" : "gap-5 p-5 sm:p-6")}>
           {trip && destination && (
             <div
               role="status"
               aria-live="polite"
               className={cn(
-                "flex flex-col gap-1 rounded-lg p-4",
+                "flex flex-col gap-1 rounded-lg",
+                journey.status === "ready" ? "order-2 p-3" : "p-4",
                 trip.exhausted && trip.fullIds.length ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-foreground",
               )}
             >
-              <p className="text-lg leading-snug font-medium">{headingMessage(trip, route, rerouted, destination)}</p>
-              {arrivalLine && <p className={cn("text-base", late ? "font-semibold text-destructive" : "text-muted-foreground")}>{arrivalLine}</p>}
+              {journey.status === "ready" && <span className="eyebrow">Plan B if the street is full</span>}
+              <p className={cn("leading-snug font-medium", journey.status === "ready" ? "text-sm" : "text-lg")}>{headingMessage(trip, route, rerouted, destination)}</p>
+              {arrivalLine && <p className={cn(journey.status === "ready" ? "text-sm" : "text-base", late ? "font-semibold text-destructive" : "text-muted-foreground")}>{arrivalLine}</p>}
+              {journey.status === "ready" && !trip.exhausted && (
+                <button type="button" onClick={() => setTrip(markCurrentFull(trip, destination, LOTS))} className="self-start pt-1 text-sm font-semibold text-destructive">
+                  Garage {trip.chain[trip.currentIndex]?.label} is full →
+                </button>
+              )}
             </div>
           )}
 
@@ -235,9 +247,9 @@ export function CarApp() {
             const green = journey.frames.map((f, i) => ({ f, i })).filter(({ f }) => f.allowed === "yes");
             const closest = green.reduce<number | null>((m, { f }) => (m === null || f.walkMin < m ? f.walkMin : m), null);
             return (
-              <div className="flex flex-col gap-2">
+              <div className="order-1 flex flex-col gap-2">
                 <span className="eyebrow">Street parking on your way</span>
-                <p className="text-base">
+                <p className="text-sm">
                   {green.length
                     ? `${green.length} of ${journey.frames.length} stretches allow parking${closest !== null ? `, the closest ${closest} min walk from the door` : ""}. Garage A is your backup.`
                     : `No legal street parking in ${journey.frames.length} photos. Head straight for Garage A.`}
@@ -340,7 +352,7 @@ export function CarApp() {
             </>
           )}
 
-          {trip && trip.chain.length > 0 && (
+          {trip && trip.chain.length > 0 && journey.status !== "ready" && (
             <ol className="flex flex-col gap-3">
               {trip.chain.map((item, i) => {
                 const lot = lotById.get(item.id)!;
@@ -386,16 +398,16 @@ export function CarApp() {
             </ol>
           )}
 
-          {trip && trip.chain.length > 0 && <p className="text-xs text-subtle">Walk times are straight-line estimates.</p>}
+          {trip && trip.chain.length > 0 && <p className="order-3 text-xs text-subtle">Walk times are straight-line estimates.</p>}
 
           {planning && (
-            <Button variant="ghost" onClick={reset} className="self-start">
+            <Button variant="ghost" onClick={reset} className="order-4 self-start">
               Start over
             </Button>
           )}
         </div>
 
-        {trip && !trip.exhausted && (
+        {trip && !trip.exhausted && journey.status !== "ready" && (
           <div className="border-t border-border p-4 sm:p-5">
             <button
               type="button"

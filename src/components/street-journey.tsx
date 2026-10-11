@@ -66,7 +66,7 @@ export function StreetJourney({
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden bg-black"
+      className="flex h-full w-full flex-col overflow-y-auto bg-black"
       onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
       onTouchEnd={(e) => {
         if (touchX.current === null) return;
@@ -75,39 +75,35 @@ export function StreetJourney({
         touchX.current = null;
       }}
     >
-      {/* The photo, filling the view; the judged curb outlined on top. */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative w-full" style={{ aspectRatio: "16 / 10" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- proxied Street View photo, sized by the frame */}
-          <img key={frame.photoUrl} src={frame.photoUrl} alt={`Street View, ${tone.title.toLowerCase()}: ${frame.kind}`} className="absolute inset-0 h-full w-full object-cover" />
-          {frame.box && (
-            <div
-              className={cn("absolute rounded-md border-4 border-dashed", tone.border, tone.fill)}
-              style={{ left: `${frame.box.x * 100}%`, top: `${frame.box.y * 100}%`, width: `${frame.box.w * 100}%`, height: `${frame.box.h * 100}%` }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Top: where we are in the drive and how old the photo is */}
-      <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-        <span className="rounded-md bg-black/65 px-2 py-1 font-mono text-xs text-white/80">
+      {/* The street, unobstructed: only the judged curb is drawn on it. */}
+      <div className="relative w-full shrink-0" style={{ aspectRatio: "16 / 10" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- proxied Street View photo, sized by the frame */}
+        <img key={frame.photoUrl} src={frame.photoUrl} alt={`Street View, ${tone.title.toLowerCase()}: ${frame.kind}`} className="absolute inset-0 h-full w-full object-cover" />
+        {frame.box && (
+          <div
+            className={cn("absolute rounded-md border-4 border-dashed", tone.border, tone.fill)}
+            style={{ left: `${frame.box.x * 100}%`, top: `${frame.box.y * 100}%`, width: `${frame.box.w * 100}%`, height: `${frame.box.h * 100}%` }}
+          />
+        )}
+        <span className="absolute top-2 left-2 rounded-md bg-black/65 px-2 py-0.5 font-mono text-[11px] text-white/80">
           {index + 1}/{frames.length} · Street View {photoDate(frame.date)}
         </span>
-        {minimap && <div className="h-28 w-28 overflow-hidden rounded-lg border border-white/20 shadow-lg sm:h-36 sm:w-36">{minimap}</div>}
+        {minimap && (
+          <div className="minimap absolute top-2 right-2 h-20 w-20 overflow-hidden rounded-lg border border-white/30 shadow-lg sm:h-32 sm:w-32">{minimap}</div>
+        )}
       </div>
 
-      {/* Bottom: the verdict, big enough to read at a glance */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-12">
+      {/* The verdict, under the photo, big enough to read at a glance */}
+      <div className="flex flex-col gap-1 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("rounded-md px-2.5 py-1 text-sm font-bold", tone.chip)}>{tone.title}</span>
+          <span className={cn("rounded-md px-2.5 py-0.5 text-sm font-bold", tone.chip)}>{tone.title}</span>
           <span className="text-base font-medium text-white">{frame.kind}</span>
+          <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk</span>
         </div>
-        <p className="text-2xl leading-tight font-bold text-white">{frame.walkMin} min walk to your meeting</p>
-        <p className="text-sm text-white/75">{frame.reason}</p>
+        <p className="text-sm leading-snug text-white/70">{frame.reason}</p>
 
-        <div className="flex items-center gap-3 pt-1">
-          <button type="button" aria-label="Previous" onClick={() => go(index - 1)} disabled={index === 0} className="h-11 w-11 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
+        <div className="flex items-center gap-2 pt-1.5">
+          <button type="button" aria-label="Previous photo" onClick={() => go(index - 1)} disabled={index === 0} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
             ‹
           </button>
           <button
@@ -116,15 +112,15 @@ export function StreetJourney({
               if (!playing && index >= frames.length - 1) onIndex(0);
               setPlaying(!playing);
             }}
-            className="h-11 rounded-full bg-primary px-5 text-base font-bold text-primary-foreground"
+            className="h-10 shrink-0 rounded-full bg-primary px-4 text-sm font-bold whitespace-nowrap text-primary-foreground"
           >
             {playing ? "❚❚ Pause" : "▶ Drive"}
           </button>
-          <button type="button" aria-label="Next" onClick={() => go(index + 1)} disabled={index === frames.length - 1} className="h-11 w-11 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
+          <button type="button" aria-label="Next photo" onClick={() => go(index + 1)} disabled={index === frames.length - 1} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
             ›
           </button>
           {/* Progress: one dot per photo, coloured by verdict */}
-          <div className="ml-auto flex max-w-[45%] flex-wrap justify-end gap-1">
+          <div className="ml-auto flex flex-wrap justify-end gap-1">
             {frames.map((f, i) => (
               <button
                 key={i}

@@ -36,7 +36,10 @@ For each photo decide if a car may park along that curb: parking lane, meters, t
 Red curb, fire hydrant, driveway, bus stop, crosswalk, loading zone (yellow), tow-away signs and "no parking" mean no.
 Use "unsure" when the curb is hidden or the signs can't be read. These photos may be months or years old; judge what you see.`;
 
-type Meta = { status: string; pano_id?: string; date?: string; location?: { lat: number; lng: number } };
+type Meta = { status: string; pano_id?: string; date?: string; copyright?: string; location?: { lat: number; lng: number } };
+
+/** Google's own street-car imagery; photos uploaded by the public are often sideways, indoors or off-road. */
+const isGoogleCar = (m: Meta) => (m.copyright ?? "").includes("Google");
 
 async function metadata(p: { lat: number; lng: number }, key: string): Promise<Meta> {
   const url = new URL("https://maps.googleapis.com/maps/api/streetview/metadata");
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
   const seen = new Set<string>();
   const frames = parsed.data.points
     .map((p, i) => ({ point: p, meta: metas[i] }))
-    .filter(({ meta }) => meta.status === "OK" && meta.pano_id && !seen.has(meta.pano_id) && seen.add(meta.pano_id))
+    .filter(({ meta }) => meta.status === "OK" && isGoogleCar(meta) && meta.pano_id && !seen.has(meta.pano_id) && seen.add(meta.pano_id))
     .map(({ point, meta }) => ({
       lat: meta.location?.lat ?? point.lat,
       lng: meta.location?.lng ?? point.lng,

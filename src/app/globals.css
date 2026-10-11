@@ -222,3 +222,13 @@
   color: var(--foreground);
   font-weight: 600;
 }
+
+/* Minimap in the street journey: keep the required map credit, but tiny. */
+.minimap .leaflet-control-attribution {
+  font-size: 7px !important;
+  line-height: 1.2;
+  padding: 0 2px;
+}
+.minimap .leaflet-control-attribution .leaflet-attribution-flag {
+  display: none !important;
+}
