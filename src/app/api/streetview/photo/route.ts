@@ -20,8 +20,13 @@ export async function GET(req: Request) {
   }).toString();
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) return new Response("No photo", { status: 404 });
-    const buf = await res.arrayBuffer();
-  return new Response(buf, {
+  return new Response(res.body, {
+    headers: {
+      "content-type": "image/jpeg",
+      "cache-control": "public, max-age=86400, immutable",
+      "netlify-vary": "query=pano|heading",
+    },
+  });
     headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400, immutable" },
   });
 }
