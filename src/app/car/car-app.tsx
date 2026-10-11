@@ -12,6 +12,7 @@ import { distanceMetres, walkDistanceText, walkMinutes } from "@/logic/geo";
 import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
+import { RoutePlanBar } from "@/components/route-plan-bar";
 import { cn } from "@/lib/utils";
 
 // Leaflet touches `window`, so the map only renders in the browser.
@@ -244,8 +245,11 @@ export function CarApp() {
           onPickDestination={(point) => chooseDestination({ ...point, name: "Point on the map" })}
         />
         )}
+        {trip && trip.chain.length > 0 && journey.status !== "ready" && (
+          <RoutePlanBar chain={trip.chain} currentIndex={trip.currentIndex} lots={lotById} />
+        )}
         {journey.status === "loading" && (
-          <span className="absolute inset-x-4 top-4 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
+          <span className="absolute inset-x-4 top-16 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
             Loading Street View and parking analysis{trip?.chain[trip.currentIndex] ? ` for Plan ${trip.chain[trip.currentIndex].label}` : " along your drive"}…
           </span>
         )}
@@ -263,6 +267,31 @@ export function CarApp() {
         )}
       >
         <div ref={panelRef} className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", journey.status === "ready" ? "gap-3 p-4" : "gap-5 p-5 sm:p-6")}>
+          {trip && trip.chain.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-surface p-2.5">
+              {trip.chain.map((item, i) => {
+                const lot = lotById.get(item.id);
+                const isCurrent = i === trip.currentIndex;
+                const isPast = i < trip.currentIndex;
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
+                      isCurrent
+                        ? "bg-primary text-primary-foreground"
+                        : isPast
+                          ? "bg-destructive/20 text-destructive line-through"
+                          : "bg-white/5 text-muted-foreground",
+                    )}
+                  >
+                    <span className="font-heading font-bold">{item.label}</span>
+                    <span className="whitespace-nowrap">{lot?.name ?? item.id}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {trip && destination && (
             <div
               role="status"
