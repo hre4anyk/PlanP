@@ -39,9 +39,18 @@ export function SafeMapContainer({ center, zoom, className, children, ...options
 
     const map = new LeafletMap(el, options);
     map.setView(center, zoom);
-    setCtx(createLeafletContext(map));
+
+    // Defer rendering children until the next frame so the map's DOM is laid
+    // out before TileLayer tries to append tiles.  In Strict Mode the first
+    // effect is cleaned up before the frame fires — the rAF is cancelled so
+    // children never render against a map that is about to be removed.
+    const rafId = requestAnimationFrame(() => {
+      map.invalidateSize();
+      setCtx(createLeafletContext(map));
+    });
 
     return () => {
+      cancelAnimationFrame(rafId);
       map.remove();
       setCtx(null);
     };
