@@ -1,17 +1,16 @@
 "use client";
 
-import type { ObjectDetector } from "@mediapipe/tasks-vision";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ChainItem } from "@/logic/chain";
 import { buildSeatChain, mergeScan, seatsFromScan, updateOccupancy, type Box, type Seat } from "@/logic/seats";
-import { detectFrame, loadDetector } from "@/vision/detector";
+import { Detector, type Delegate, type Frame } from "@/vision/detector";
 import { cn } from "@/lib/utils";
 
 type Phase = "idle" | "starting" | "scanning" | "ready" | "guiding" | "checking" | "landed" | "full" | "error";
 
 const SCAN_MS = 2000;
-const UI_INTERVAL_MS = 80; // ~12 UI updates a second; detection runs every frame
+const UI_INTERVAL_MS = 80; // ~12 UI updates a second; detection runs as fast as the phone allows
 
 /** Spoken announcements. The browser voice for now; OpenAI Realtime takes over in batch 6. */
 function announce(text: string) {
@@ -26,22 +25,24 @@ function pct(box: Box) {
 
 export function MeApp() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const detectorRef = useRef<ObjectDetector | null>(null);
+  const detectorRef = useRef<Detector | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef(0);
   const phaseRef = useRef<Phase>("idle");
   const scanRef = useRef<{ started: number; frames: Box[][] }>({ started: 0, frames: [] });
   const seatsRef = useRef<Seat[]>([]);
   const fpsRef = useRef({ frames: 0, since: 0 });
-  /** The seat we're walking the driver to, read by the camera loop. */
+  /** The seat we're walking the driver to, read by the frame handler. */
   const targetRef = useRef<ChainItem | null>(null);
 
   const [phase, setPhaseState] = useState<Phase>("idle");
+  const [startStatus, setStartStatus] = useState("");
   const [error, setError] = useState("");
-  const [aspect, setAspect] = useState(16 / 9);
+  const [aspect, setAspect] = useState(4 / 3);
   const [seats, setSeats] = useState<Seat[]>([]);
   const [people, setPeople] = useState<Box[]>([]);
   const [fps, setFps] = useState(0);
+  const [delegate, setDelegate] = useState<Delegate>("GPU");
   const [scanProgress, setScanProgress] = useState(0);
   const [chain, setChain] = useState<ChainItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -54,94 +55,127 @@ export function MeApp() {
     setPhaseState(next);
   }
 
-  // Stop the camera and the loop when leaving the page.
+  // Stop the camera, the loop and the worker when leaving the page.
   useEffect(
     () => () => {
       cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      detectorRef.current?.close();
+      detectorRef.current?.stop();
     },
     [],
   );
 
+  /** Feed camera frames to the worker; results arrive in handleFrame. */
   function loop() {
     const video = videoRef.current;
-    const detector = detectorRef.current;
-    if (video && detector && video.readyState >= 2) {
-      const now = performance.now();
-      const frame = detectFrame(detector, video, now);
+    if (video && detectorRef.current) detectorRef.current.push(video);
+    rafRef.current = requestAnimationFrame(loop);
+  }
 
-      const fpsState = fpsRef.current;
-      fpsState.frames += 1;
-      const uiDue = now - fpsState.since >= UI_INTERVAL_MS;
+  function handleFrame(frame: Frame) {
+    const video = videoRef.current;
+    if (!video) return;
+    const now = frame.timestamp;
+    const videoAspect = video.videoWidth / video.videoHeight || aspect;
 
-      if (phaseRef.current === "scanning") {
-        const scan = scanRef.current;
-        scan.frames.push(frame.seats);
-        const progress = Math.min(1, (now - scan.started) / SCAN_MS);
-        if (progress >= 1) {
-          const found = seatsFromScan(mergeScan(scan.frames), video.videoWidth / video.videoHeight);
-          seatsRef.current = found;
-          setSeats(found);
-          setPhase(found.length ? "ready" : "error");
-          if (!found.length) setError("No chairs found. Point the camera at the room and rescan.");
-          else announce(`I can see ${found.length} seat${found.length === 1 ? "" : "s"}.`);
-        } else if (uiDue) {
-          setScanProgress(progress);
-          setSeats(seatsFromScan(mergeScan(scan.frames, 0), video.videoWidth / video.videoHeight));
-        }
-      } else if (seatsRef.current.length) {
-        seatsRef.current = updateOccupancy(seatsRef.current, frame.people, now);
-        // The target seat just got taken: ask who it was (Claude answers this in batch 5).
-        const target = targetRef.current;
-        if (phaseRef.current === "guiding" && target && seatsRef.current.find((s) => s.id === target.id)?.state === "taken") {
-          setSeats(seatsRef.current);
-          setPhase("checking");
-          announce(`Someone just sat in Plan ${target.label}. Was that you?`);
-        }
+    const fpsState = fpsRef.current;
+    fpsState.frames += 1;
+    const uiDue = now - fpsState.since >= UI_INTERVAL_MS;
+
+    if (phaseRef.current === "scanning") {
+      const scan = scanRef.current;
+      scan.frames.push(frame.seats);
+      const progress = Math.min(1, (now - scan.started) / SCAN_MS);
+      if (progress >= 1) {
+        const found = seatsFromScan(mergeScan(scan.frames), videoAspect);
+        seatsRef.current = found;
+        setSeats(found);
+        setPhase(found.length ? "ready" : "error");
+        if (!found.length) setError("No chairs found. Point the camera at the room and rescan.");
+        else announce(`I can see ${found.length} seat${found.length === 1 ? "" : "s"}.`);
+      } else if (uiDue) {
+        setScanProgress(progress);
+        setSeats(seatsFromScan(mergeScan(scan.frames, 0), videoAspect));
       }
-
-      if (uiDue) {
-        if (phaseRef.current !== "scanning" && seatsRef.current.length) setSeats(seatsRef.current);
-        setPeople(frame.people);
-        setFps(Math.round((fpsState.frames * 1000) / (now - fpsState.since)));
-        fpsRef.current = { frames: 0, since: now };
+    } else if (seatsRef.current.length) {
+      seatsRef.current = updateOccupancy(seatsRef.current, frame.people, now);
+      // The target seat just got taken: ask who it was (Claude answers this in batch 5).
+      const target = targetRef.current;
+      if (phaseRef.current === "guiding" && target && seatsRef.current.find((s) => s.id === target.id)?.state === "taken") {
+        setSeats(seatsRef.current);
+        setPhase("checking");
+        announce(`Someone just sat in Plan ${target.label}. Was that you?`);
       }
     }
-    rafRef.current = requestAnimationFrame(loop);
+
+    if (uiDue) {
+      if (phaseRef.current !== "scanning" && seatsRef.current.length) setSeats(seatsRef.current);
+      setPeople(frame.people);
+      setFps(Math.round((fpsState.frames * 1000) / (now - fpsState.since)));
+      fpsRef.current = { frames: 0, since: now };
+    }
   }
 
   async function startCamera() {
     setError("");
     setPhase("starting");
+    // Unlock speech on iPhone: it only plays after a tap, so say something during this one.
+    announce("Starting the camera.");
     try {
-      const [stream, detector] = await Promise.all([
-        navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        }),
-        detectorRef.current ? Promise.resolve(detectorRef.current) : loadDetector(),
-      ]);
+      setStartStatus("Asking for camera access…");
+      // A small picture is plenty for chairs and much faster on a phone.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
       streamRef.current = stream;
-      detectorRef.current = detector;
       const video = videoRef.current!;
+      // Safari only plays inline, muted video without another tap. React doesn't apply `muted`
+      // to server-rendered markup, so set both directly.
+      video.muted = true;
+      video.setAttribute("playsinline", "");
       video.srcObject = stream;
-      await video.play();
-      setAspect(video.videoWidth / video.videoHeight || 16 / 9);
+      try {
+        await video.play();
+      } catch {
+        throw new Error("The camera started but the video couldn't play. Tap Start camera again.");
+      }
+      setAspect(video.videoWidth / video.videoHeight || 4 / 3);
+
+      if (!detectorRef.current) {
+        setStartStatus("Loading the detector (about 20 MB the first time)…");
+        const detector = await Detector.start();
+        detector.onFrame = handleFrame;
+        detector.onError = (message) => {
+          setError(`The detector stopped: ${message}. Tap Rescan to try again.`);
+          setPhase("error");
+        };
+        detectorRef.current = detector;
+        setDelegate(detector.delegate);
+      }
       // Keep the screen awake on the stand during the demo.
       await (navigator as Navigator & { wakeLock?: { request(type: "screen"): Promise<unknown> } }).wakeLock
         ?.request("screen")
         .catch(() => {});
+      setStartStatus("");
       fpsRef.current = { frames: 0, since: performance.now() };
+      cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(loop);
       scan();
     } catch (e) {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setStartStatus("");
       setPhase("error");
-      setError(
-        e instanceof DOMException && e.name === "NotAllowedError"
-          ? "Camera access was blocked. Allow it in the browser settings and try again."
-          : "Couldn't start the camera. Plan P needs a secure (https) link and a browser camera.",
-      );
+      if (e instanceof DOMException && e.name === "NotAllowedError") {
+        setError("Camera access was blocked. On iPhone: tap aA in the address bar → Website Settings → Camera → Allow, then try again.");
+      } else if (e instanceof DOMException && e.name === "NotFoundError") {
+        setError("No camera found on this device.");
+      } else if (!window.isSecureContext) {
+        setError("The camera only works on a secure (https) link.");
+      } else {
+        setError(e instanceof Error ? e.message : "Couldn't start the camera.");
+      }
     }
   }
 
@@ -211,7 +245,7 @@ export function MeApp() {
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden" style={{ containerType: "size" }}>
         {/* Largest box with the camera's aspect ratio that fits, so the picture is never stretched. */}
         <div className="relative" style={{ aspectRatio: aspect, width: `min(100cqw, calc(100cqh * ${aspect}))` }}>
-          <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full" />
+          <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full" />
 
           {people.map((p, i) => (
             <div key={`p${i}`} className="absolute rounded-md border border-dashed border-white/40" style={pct(p)} />
@@ -256,7 +290,7 @@ export function MeApp() {
 
         {cameraOn && (
           <span className="absolute top-3 right-3 rounded-md bg-black/60 px-2 py-1 font-mono text-xs text-white/70">
-            on-device detector · {fps} fps · $0
+            on-device · {delegate} · {fps} fps · $0
           </span>
         )}
 
@@ -280,7 +314,7 @@ export function MeApp() {
             </p>
             {error && <p className="max-w-sm text-destructive">{error}</p>}
             <Button size="lg" className="h-14 px-8 text-lg" onClick={startCamera} disabled={phase === "starting"}>
-              {phase === "starting" ? "Starting camera…" : "Start camera"}
+              {phase === "starting" ? startStatus || "Starting…" : "Start camera"}
             </Button>
           </div>
         )}

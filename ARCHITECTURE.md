@@ -52,7 +52,8 @@ src/                         Next.js app (Netlify)
     trip.ts                  car trip in the browser: start, "Lot is full" → next plan, grow chain, full lots for the map
     trip.test.ts
   vision/
-    detector.ts              MediaPipe object detector wrapper (load once, detect per frame)
+    detector.ts              starts the detector worker; sends one camera frame at a time (stale frames dropped)
+    detector-worker.ts       Web Worker running MediaPipe (GPU first, CPU fallback with a fresh runtime)
     frame.ts                 grab a JPEG from the video, cropped to one chair
   voice/
     realtime.ts              WebRTC session, tool definitions, announce(text)
@@ -129,7 +130,7 @@ Notes:
 - **Claude in `/api/look`:** `@anthropic-ai/sdk` directly, because this check is time-critical and shouldn't wait on a job queue. Images resized to ≤ 768 px and cropped to the chair. The result is posted to the Anbaric job as an event, attributed to `Agent("claude-eyes")`.
 - **Opus 5.5 thinking can't be turned off;** speed and cost are controlled with `effort: "low"`.
 - **OpenAI Realtime:** the browser connects over WebRTC with a short-lived key from `/api/voice-key`. Tool calls arrive on the data channel; the browser runs them (instant reroute, call the engine) and returns the result. Announcements are sent into the same session so one voice speaks everything. Exact endpoint and event names get checked against OpenAI's Realtime docs when it's built (batch 6).
-- **MediaPipe:** `@mediapipe/tasks-vision`; model file served from `public/models/`, so the demo doesn't depend on a CDN.
+- **MediaPipe:** `@mediapipe/tasks-vision` in a Web Worker so the camera view stays smooth on phones; 640×480 camera frames; runtime and model copied into `public/mediapipe/` by `scripts/mediapipe-assets.mjs` before dev/build, so the demo doesn't depend on a CDN.
 
 ## 5. Fallbacks
 
