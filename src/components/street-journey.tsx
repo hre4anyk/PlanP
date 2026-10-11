@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import type { LatLng } from "@/data/lots";
+import { walkDistanceText } from "@/logic/geo";
 
 /** One Street View photo along the last stretch, with Claude's verdict on the right-hand curb. */
 export type CurbFrame = {
@@ -44,17 +46,22 @@ export function StreetJourney({
   frames,
   index,
   onIndex,
+  destination,
   minimap,
   autoStart = false,
   paced = false,
+  holdAt = null,
 }: {
   frames: CurbFrame[];
   index: number;
   onIndex: (i: number) => void;
+  destination: LatLng | null;
   minimap?: React.ReactNode;
   autoStart?: boolean;
-  /** The voice copilot moves the car (one stretch per answer): no ▶ Drive button. */
+  /** The voice copilot is driving the conversation: no ▶ Drive button. */
   paced?: boolean;
+  /** Don't drive past this photo yet (the pitch isn't finished); playback resumes when cleared. */
+  holdAt?: number | null;
 }) {
   const [playing, setPlaying] = useState(autoStart);
   const touchX = useRef<number | null>(null);
@@ -63,13 +70,14 @@ export function StreetJourney({
 
   useEffect(() => {
     if (!playing) return;
+    if (holdAt !== null && index >= holdAt) return;
     if (index >= frames.length - 1) {
       const stop = setTimeout(() => setPlaying(false), 0);
       return () => clearTimeout(stop);
     }
     const next = setTimeout(() => onIndex(index + 1), frames[index].walkMin <= PARKING_ZONE_WALK_MIN ? AUTOPLAY_MS.zone : AUTOPLAY_MS.driving);
     return () => clearTimeout(next);
-  }, [playing, index, frames, onIndex]);
+  }, [playing, index, frames, onIndex, holdAt]);
 
   const go = (i: number) => onIndex(Math.max(0, Math.min(frames.length - 1, i)));
 
@@ -94,6 +102,12 @@ export function StreetJourney({
             style={{ left: `${frame.box.x * 100}%`, top: `${frame.box.y * 100}%`, width: `${frame.box.w * 100}%`, height: `${frame.box.h * 100}%` }}
           />
         )}
+        {frame.status === "free_to_park" && destination && (
+          <div className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] rounded-lg bg-success px-3 py-2 text-black shadow-lg">
+            <p className="text-sm font-bold sm:text-base">{walkDistanceText(frame, destination)}</p>
+            <p className="text-xs">Straight-line estimate · availability shown in this photo</p>
+          </div>
+        )}
         {/* Load the next photos ahead so the drive never stalls on a slow connection. */}
         <div className="hidden" aria-hidden>
           {frames.slice(index + 1, index + 1 + PRELOAD_AHEAD).map((f) => (
@@ -114,7 +128,7 @@ export function StreetJourney({
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn("rounded-md px-2.5 py-0.5 text-sm font-bold", tone.chip)}>{tone.title}</span>
           <span className="text-base font-medium text-white">{frame.kind}</span>
-          <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk</span>
+          <span className="ml-auto text-sm font-bold text-white sm:text-base">{destination ? walkDistanceText(frame, destination) : `${frame.walkMin} min walk`}</span>
         </div>
         <p className="text-sm leading-snug text-white/70">{frame.reason}</p>
 

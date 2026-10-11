@@ -1,0 +1,60 @@
+"use client";
+
+import { LeafletContext, createLeafletContext } from "@react-leaflet/core";
+import { Map as LeafletMap } from "leaflet";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+
+type Props = {
+  center: [number, number];
+  zoom: number;
+  className?: string;
+  zoomControl?: boolean;
+  zoomAnimation?: boolean;
+  attributionControl?: boolean;
+  children: ReactNode;
+};
+
+/**
+ * A Strict-Mode-safe replacement for react-leaflet's <MapContainer>.
+ *
+ * react-leaflet v5 creates the Leaflet map in a ref callback (runs once) but
+ * removes it in a useEffect cleanup (runs during Strict Mode double-invoke).
+ * After cleanup the map is gone but the ref callback never re-runs, so children
+ * try to use a removed map → "appendChild" / "container reused" errors.
+ *
+ * This version creates the map inside useEffect so it is properly re-created
+ * after Strict Mode cleanup.
+ */
+export function SafeMapContainer({ center, zoom, className, children, ...options }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [ctx, setCtx] = useState<ReturnType<typeof createLeafletContext> | null>(null);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Clear any stale DOM and Leaflet state from a previous instance.
+    el.innerHTML = "";
+    const elAny = el as unknown as { _leaflet_id?: number };
+    if (elAny._leaflet_id) delete elAny._leaflet_id;
+
+    const map = new LeafletMap(el, options);
+    map.setView(center, zoom);
+    map.invalidateSize();
+    setCtx(createLeafletContext(map));
+
+    return () => {
+      // Remove all layers first so their cleanups don't touch a removed map.
+      map.eachLayer((layer) => map.removeLayer(layer));
+      map.remove();
+      setCtx(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div ref={containerRef} className={className}>
+      {ctx ? <LeafletContext value={ctx}>{children}</LeafletContext> : null}
+    </div>
+  );
+}
