@@ -354,7 +354,7 @@ export function CarApp() {
 
           {journey.status === "ready" && (
             <>
-              <SpotList frames={journey.frames} destination={destination} />
+              <SpotList frame={journey.frames[frameIndex]} destination={destination} />
               <span className="font-mono text-xs text-subtle">
                 Claude + Street View · {journey.trace.photos} photos ·{" "}
                 {journey.trace.precomputed ? `read once, $${journey.trace.costUsd.toFixed(2)}` : `${(journey.trace.ms / 1000).toFixed(1)} s · $${journey.trace.costUsd.toFixed(2)}`}
