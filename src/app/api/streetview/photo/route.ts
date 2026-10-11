@@ -27,6 +27,4 @@ export async function GET(req: Request) {
       "netlify-vary": "query=pano|heading",
     },
   });
-    headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400, immutable" },
-  });
 }
