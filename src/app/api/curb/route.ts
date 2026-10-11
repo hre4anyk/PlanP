@@ -19,7 +19,11 @@ const Verdicts = z.object({
   photos: z.array(
     z.object({
       photo: z.number().describe("The photo number, 1-based"),
-      allowed: z.enum(["yes", "no", "unsure"]).describe("Can a car park on the RIGHT-hand curb here?"),
+      status: z.enum(["free_to_park", "cant_park", "occupied"]).describe(
+        "free_to_park = parking is allowed AND the curb space is empty (no cars parked there). " +
+        "cant_park = parking is NOT allowed (red curb, fire hydrant, driveway, bus stop, no parking sign, etc.). " +
+        "occupied = parking is allowed but every space along this curb is taken by parked cars."
+      ),
       kind: z.string().describe("Two to four words: 'metered parking', '2-hour zone', 'free parking', 'red curb', 'driveway', 'bus stop', 'no curb visible'"),
       reason: z.string().describe("One short sentence on what you see that decides it"),
       box: z
@@ -32,9 +36,14 @@ const Verdicts = z.object({
 
 const PROMPT = `You are the eyes of Plan P, which helps a stressed driver find street parking near a meeting in San Francisco.
 Each photo is Google Street View, taken from the road looking ahead and slightly right. Look at the RIGHT-hand curb only.
-For each photo decide if a car may park along that curb: parking lane, meters, time-limit signs and painted curbs matter.
-Red curb, fire hydrant, driveway, bus stop, crosswalk, loading zone (yellow), tow-away signs and "no parking" mean no.
-Use "unsure" when the curb is hidden or the signs can't be read. These photos may be months or years old; judge what you see.`;
+For each photo, classify the right-hand curb into exactly one of three states:
+
+1. "free_to_park" — Parking is allowed here (parking lane, meters, time-limit zone, unpainted curb with no restrictions) AND the curb space is empty or has room for a car to park. No cars are currently parked there, or there is visible open space.
+2. "cant_park" — Parking is NOT allowed here. Red curb, fire hydrant, driveway, bus stop, crosswalk, loading zone (yellow), tow-away signs, "no parking" signs, or no curb visible.
+3. "occupied" — Parking IS allowed here (it's a legal parking zone) but every space along this curb is taken by parked cars. There is no room for another car.
+
+Look carefully at whether cars are actually parked along the curb to distinguish "free_to_park" from "occupied".
+These photos may be months or years old; judge what you see in each photo.`;
 
 type Meta = { status: string; pano_id?: string; date?: string; copyright?: string; location?: { lat: number; lng: number } };
 
@@ -125,7 +134,7 @@ export async function POST(req: Request) {
       heading: f.heading,
       date: f.date,
       photoUrl: `/api/streetview/photo?pano=${encodeURIComponent(f.panoId)}&heading=${Math.round(f.heading)}`,
-      allowed: v?.allowed ?? "unsure",
+      status: v?.status ?? "cant_park",
       kind: v?.kind ?? "not checked",
       reason: v?.reason ?? "Claude couldn't read this photo.",
       box: v?.box ?? null,

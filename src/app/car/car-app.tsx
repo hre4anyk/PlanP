@@ -65,6 +65,7 @@ export function CarApp() {
   const [routedAt, setRoutedAt] = useState<Date | null>(null);
   const [journey, setJourney] = useState<Journey>({ status: "idle" });
   const [frameIndex, setFrameIndex] = useState(0);
+  const [parked, setParked] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Show the status card from the top whenever the plan changes.
@@ -114,6 +115,7 @@ export function CarApp() {
     setRoute(null);
     setJourney({ status: "idle" });
     setFrameIndex(0);
+    setParked(false);
   }
 
   /** S2: the drive straight to the meeting → Street View photos of its last stretch → Claude's verdicts. */
@@ -254,40 +256,43 @@ export function CarApp() {
                 trip.exhausted && trip.fullIds.length ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-foreground",
               )}
             >
-              {journey.status === "ready" && <span className="eyebrow">Plan B if the street is full</span>}
+              {journey.status === "ready" && <span className="eyebrow">Garage backup — {trip.chain.length} plans</span>}
               <p className={cn("leading-snug font-medium", journey.status === "ready" ? "text-sm" : "text-lg")}>{headingMessage(trip, route, rerouted, destination)}</p>
               {arrivalLine && <p className={cn(journey.status === "ready" ? "text-sm" : "text-base", late ? "font-semibold text-destructive" : "text-muted-foreground")}>{arrivalLine}</p>}
-              {journey.status === "ready" && !trip.exhausted && (
-                <button type="button" onClick={() => setTrip(markCurrentFull(trip, destination, LOTS))} className="self-start pt-1 text-sm font-semibold text-destructive">
-                  Garage {trip.chain[trip.currentIndex]?.label} is full →
-                </button>
+              {journey.status === "ready" && !trip.exhausted && !parked && (
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setParked(true)} className="rounded-md bg-success px-3 py-1 text-sm font-bold text-black">
+                    Garage {trip.chain[trip.currentIndex]?.label} is Free
+                  </button>
+                  <button type="button" onClick={() => setTrip(markCurrentFull(trip, destination, LOTS))} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
+                    Occupied →
+                  </button>
+                </div>
+              )}
+              {journey.status === "ready" && parked && (
+                <p className="pt-1 text-sm font-semibold text-success">Parked! You're all set.</p>
               )}
             </div>
           )}
 
           {journey.status === "ready" && (() => {
-            const green = journey.frames.map((f, i) => ({ f, i })).filter(({ f }) => f.allowed === "yes" && f.walkMin <= PARKING_ZONE_WALK_MIN);
-            const closest = green.reduce<number | null>((m, { f }) => (m === null || f.walkMin < m ? f.walkMin : m), null);
+            const freeSpots = journey.frames
+              .map((f, i) => ({ f, i }))
+              .filter(({ f }) => f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN);
+            const closest = freeSpots.reduce<number | null>((m, { f }) => (m === null || f.walkMin < m ? f.walkMin : m), null);
             return (
-              <div className="order-1 flex flex-col gap-2">
+              <div className="order-1 flex flex-col gap-1">
                 <span className="eyebrow">Street parking on your way</span>
-                <p className="text-sm">
-                  {green.length
-                    ? `${green.length} stretches within a ${PARKING_ZONE_WALK_MIN}-minute walk allow parking${closest !== null ? `, the closest ${closest} min from the door` : ""}. Garage A is your backup.`
-                    : `No legal street parking within a ${PARKING_ZONE_WALK_MIN}-minute walk. Head straight for Garage A.`}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {green.map(({ f, i }) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setFrameIndex(i)}
-                      className={cn("rounded-full border px-3 py-1.5 text-xs", i === frameIndex ? "border-success text-foreground" : "border-success/40 text-muted-foreground")}
-                    >
-                      {f.walkMin} min walk · {f.kind}
-                    </button>
-                  ))}
-                </div>
+                {freeSpots.length > 0 ? (
+                  <p className="text-sm">
+                    {freeSpots.length} spot{freeSpots.length > 1 ? "s" : ""} free to park
+                    {closest !== null ? ` — closest is ${closest} min walk to your destination` : ""}.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No free street parking within a {PARKING_ZONE_WALK_MIN}-minute walk. Head for Garage {trip?.chain[0]?.label ?? "A"}.
+                  </p>
+                )}
                 <span className="font-mono text-xs text-subtle">
                   Claude + Street View · {journey.trace.photos} photos ·{" "}
                   {journey.trace.precomputed ? `read once, $${journey.trace.costUsd.toFixed(2)}` : `${(journey.trace.ms / 1000).toFixed(1)} s · $${journey.trace.costUsd.toFixed(2)}`}
@@ -443,15 +448,34 @@ export function CarApp() {
           )}
         </div>
 
-        {trip && !trip.exhausted && journey.status !== "ready" && (
+        {trip && !trip.exhausted && journey.status !== "ready" && !parked && (
           <div className="border-t border-border p-4 sm:p-5">
-            <button
-              type="button"
-              onClick={() => destination && setTrip(markCurrentFull(trip, destination, LOTS))}
-              className="h-16 w-full rounded-xl bg-destructive text-xl font-bold text-white transition-transform active:scale-[0.98]"
-            >
-              Lot is full
-            </button>
+            <p className="mb-2 text-center text-sm text-muted-foreground">
+              Arrived at Garage {trip.chain[trip.currentIndex]?.label}?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setParked(true)}
+                className="h-16 flex-1 rounded-xl bg-success text-xl font-bold text-black transition-transform active:scale-[0.98]"
+              >
+                Free
+              </button>
+              <button
+                type="button"
+                onClick={() => destination && setTrip(markCurrentFull(trip, destination, LOTS))}
+                className="h-16 flex-1 rounded-xl bg-destructive text-xl font-bold text-white transition-transform active:scale-[0.98]"
+              >
+                Occupied
+              </button>
+            </div>
+          </div>
+        )}
+        {trip && parked && (
+          <div className="border-t border-border p-4 sm:p-5">
+            <div className="flex h-16 items-center justify-center rounded-xl bg-success/15 text-lg font-bold text-success">
+              ✓ Parked — you've arrived!
+            </div>
           </div>
         )}
       </aside>

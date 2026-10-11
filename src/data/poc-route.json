@@ -468,7 +468,6 @@
    "heading": 159.58819540925504,
    "date": "2024-12",
    "photoUrl": "/api/streetview/photo?pano=QXs23td5AtCOar9Lgf8d8g&heading=160",
-   "allowed": "no",
    "kind": "red curb",
    "reason": "The right-hand curb at the corner is painted red, with a fire hydrant and crosswalk.",
    "box": {
@@ -476,7 +475,8 @@
     "y": 0.6,
     "w": 0.68,
     "h": 0.38
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78192677202655,
@@ -485,7 +485,6 @@
    "heading": 70.05854237260405,
    "date": "2011-04",
    "photoUrl": "/api/streetview/photo?pano=slotQ_IKpanlgB703pQ7Hg&heading=70",
-   "allowed": "yes",
    "kind": "free parking",
    "reason": "Cars are parked along the unpainted right curb, and no restriction signs are visible.",
    "box": {
@@ -493,7 +492,8 @@
     "y": 0.45,
     "w": 0.6,
     "h": 0.4
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.78219651723052,
@@ -502,7 +502,6 @@
    "heading": 69.81992447801724,
    "date": "2011-04",
    "photoUrl": "/api/streetview/photo?pano=2slEN1yVhQthQvMr7Vi2AQ&heading=70",
-   "allowed": "yes",
    "kind": "free parking",
    "reason": "A van and cars are parked along the unpainted right curb, and no signs prohibit parking.",
    "box": {
@@ -510,7 +509,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.78247064594234,
@@ -519,7 +519,6 @@
    "heading": 69.81992447801724,
    "date": "2011-04",
    "photoUrl": "/api/streetview/photo?pano=_V6IofouzH1cFVFg6Q2iJQ&heading=70",
-   "allowed": "unsure",
    "kind": "unreadable sign",
    "reason": "The curb is unpainted and empty, but a small sign on the wall can't be read.",
    "box": {
@@ -527,7 +526,8 @@
     "y": 0.5,
     "w": 0.6,
     "h": 0.45
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78275360146365,
@@ -536,7 +536,6 @@
    "heading": 69.81992447801724,
    "date": "2011-04",
    "photoUrl": "/api/streetview/photo?pano=foUllwPbuthRGt_h4hzp_g&heading=70",
-   "allowed": "no",
    "kind": "driveway",
    "reason": "Garage doors along the right curb need clear access, and the posted signs look like parking restrictions.",
    "box": {
@@ -544,7 +543,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78295428478891,
@@ -553,7 +553,6 @@
    "heading": 69.81992447801724,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=EfEj4bOpsBhBDLckzp-cSw&heading=70",
-   "allowed": "no",
    "kind": "tow-away zone",
    "reason": "A red tow-away style sign is posted over the right curb, and a dumpster and garage doors line it.",
    "box": {
@@ -561,7 +560,8 @@
     "y": 0.5,
     "w": 0.65,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78321229572888,
@@ -570,7 +570,6 @@
    "heading": 69.81992447801724,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=DZ0nyMFogJ1RhAke9oA_iA&heading=70",
-   "allowed": "no",
    "kind": "no parking alley",
    "reason": "Wall painted 'NO PARKING ANYTIME' and a garage door line the right curb.",
    "box": {
@@ -578,7 +577,8 @@
     "y": 0.33,
     "w": 0.48,
     "h": 0.37
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78347062465027,
@@ -587,10 +587,10 @@
    "heading": 69.68766655103957,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=aHR-OZucyQeDWDS6doiiUw&heading=70",
-   "allowed": "no",
    "kind": "no curb visible",
    "reason": "Foreground is an intersection with crosswalk markings; there is no usable right curb in view.",
-   "box": null
+   "box": null,
+   "status": "cant_park"
   },
   {
    "lat": 37.78334844948286,
@@ -599,7 +599,6 @@
    "heading": 160.86032182077565,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=Kzt1gtRWa9MDLuFdUgRMxg&heading=161",
-   "allowed": "no",
    "kind": "bike lane, no parking",
    "reason": "Right curb has a bike lane with flexible posts and no parking lane or meters.",
    "box": {
@@ -607,7 +606,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78309021545878,
@@ -616,7 +616,6 @@
    "heading": 160.71438782496034,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=L2tFkj0ysv_KCfstKyPMYA&heading=161",
-   "allowed": "no",
    "kind": "bike lane, no parking",
    "reason": "Right side is a post-separated bike lane along the curb with no parked cars.",
    "box": {
@@ -624,7 +623,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78283384326498,
@@ -633,7 +633,6 @@
    "heading": 161.37690421434877,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=Mw9PbaogDNikvBSu68ZGRw&heading=161",
-   "allowed": "no",
    "kind": "crosswalk/intersection",
    "reason": "Right side is a crosswalk at the intersection, with no-turn signs and a yellow curb corner.",
    "box": {
@@ -641,7 +640,8 @@
     "y": 0.5,
     "w": 0.45,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78257790555492,
@@ -650,7 +650,6 @@
    "heading": 159.86873745121687,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=0HfD0aViuNFxyrwNCFzIxg&heading=160",
-   "allowed": "unsure",
    "kind": "possible parking lane",
    "reason": "A red car is parked at the right curb, but the far sign and the curb paint can't be read.",
    "box": {
@@ -658,7 +657,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78229916359439,
@@ -667,7 +667,6 @@
    "heading": 163.60259282545013,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=Lr3NteXIUP9P6zzBNFtVEw&heading=164",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "Right curb is lined by a striped bike lane with no parked cars or meters.",
    "box": {
@@ -675,7 +674,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.2
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78204509121031,
@@ -684,7 +684,6 @@
    "heading": 157.5624653012087,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=Rm0dym7JGoUXdGIWaIlrNw&heading=158",
-   "allowed": "no",
    "kind": "protected bike lane",
    "reason": "Right side has a bike lane with flexible posts and a driveway, no parking lane.",
    "box": {
@@ -692,7 +691,8 @@
     "y": 0.55,
     "w": 0.5,
     "h": 0.25
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78183547497564,
@@ -701,7 +701,6 @@
    "heading": 159.2570244237603,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=kF4fBea_hcXsI-Np8cf6aA&heading=159",
-   "allowed": "no",
    "kind": "no parking lane",
    "reason": "Right curb is empty with a bike lane stripe and no meters or parked cars.",
    "box": {
@@ -709,7 +708,8 @@
     "y": 0.5,
     "w": 0.5,
     "h": 0.25
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78157460850623,
@@ -718,7 +718,6 @@
    "heading": 165.40540689172258,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=Jg9pt59O4r7kTAamzj6k8w&heading=165",
-   "allowed": "no",
    "kind": "crosswalk/bike lane",
    "reason": "Right side is an intersection with crosswalk and green bike lane, no curb parking.",
    "box": {
@@ -726,7 +725,8 @@
     "y": 0.55,
     "w": 0.4,
     "h": 0.2
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78128259776187,
@@ -735,7 +735,6 @@
    "heading": 160.22314231667008,
    "date": "2021-03",
    "photoUrl": "/api/streetview/photo?pano=Dla5Vn4qswGxp2IAGDsSow&heading=160",
-   "allowed": "no",
    "kind": "protected bike lane",
    "reason": "Right curb has a post-protected bike lane next to a parking lot, no street parking.",
    "box": {
@@ -743,7 +742,8 @@
     "y": 0.55,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78103036140477,
@@ -752,7 +752,6 @@
    "heading": 160.24318954605172,
    "date": "2025-05",
    "photoUrl": "/api/streetview/photo?pano=QaQT8_6tuxw1ZyDID1jlyA&heading=160",
-   "allowed": "no",
    "kind": "protected bike lane",
    "reason": "Right curb has a bike lane with flexible posts and no parked cars or meters.",
    "box": {
@@ -760,7 +759,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78081552357458,
@@ -769,7 +769,6 @@
    "heading": 160.24318954605172,
    "date": "2025-05",
    "photoUrl": "/api/streetview/photo?pano=M-L3Uesy4CfCAM63CU5v3g&heading=160",
-   "allowed": "no",
    "kind": "no curb parking",
    "reason": "Right curb near camera has no parking lane, just a travel lane edge by a bike rack/scooter area and an intersection with 'Keep Clear' markings.",
    "box": {
@@ -777,7 +776,8 @@
     "y": 0.6,
     "w": 0.45,
     "h": 0.2
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78055344033778,
@@ -786,7 +786,6 @@
    "heading": 160.56412339809037,
    "date": "2025-05",
    "photoUrl": "/api/streetview/photo?pano=rlKK5Ck7xOIZ3mVdvQ4TvQ&heading=161",
-   "allowed": "yes",
    "kind": "parking lane",
    "reason": "Cars are parked along a marked parking lane on the right curb with no red paint visible.",
    "box": {
@@ -794,7 +793,8 @@
     "y": 0.55,
     "w": 0.4,
     "h": 0.3
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.78001523560923,
@@ -803,7 +803,6 @@
    "heading": 159.66753449650287,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=-D7azEuV2I36txtXiquzYQ&heading=160",
-   "allowed": "no",
    "kind": "no parking lane",
    "reason": "Right curb has a yellow edge line along the travel lane with no parked cars or parking lane visible.",
    "box": {
@@ -811,7 +810,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77975038297796,
@@ -820,7 +820,6 @@
    "heading": 160.23895032198607,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=dgplQcRvXX1WbGkGsq_TVQ&heading=160",
-   "allowed": "unsure",
    "kind": "bike lane curb",
    "reason": "Right side shows a buffered bike lane next to the curb with no parked cars or parking signs visible.",
    "box": {
@@ -828,7 +827,8 @@
     "y": 0.47,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77952000845492,
@@ -837,7 +837,6 @@
    "heading": 156.47417791572525,
    "date": "2023-01",
    "photoUrl": "/api/streetview/photo?pano=aOwGhwNCttXN-CcN7a1IFg&heading=156",
-   "allowed": "no",
    "kind": "bike lane, stop zone",
    "reason": "Green bike lane markings and a crosswalk by the stop sign occupy the right curb near the corner.",
    "box": {
@@ -845,7 +844,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77925981424362,
@@ -854,7 +854,6 @@
    "heading": 159.79926827370537,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=Mtqq6WvF0KLpe8WWWpPQ7Q&heading=160",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "A striped bike lane runs along the right curb with no parking lane or parked cars.",
    "box": {
@@ -862,7 +861,8 @@
     "y": 0.52,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.7787421798666,
@@ -871,7 +871,6 @@
    "heading": 160.13499413225736,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=f0WfxrqNg2V-837gmSWEhw&heading=160",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "The right curb has a bike lane and posts under the freeway, and the cars visible are in traffic lanes.",
    "box": {
@@ -879,7 +878,8 @@
     "y": 0.55,
     "w": 0.25,
     "h": 0.15
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77849501320424,
@@ -888,7 +888,6 @@
    "heading": 160.47394951372212,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=XeiOR4z6iR_vfeNLxLQjdg&heading=160",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "A protected bike lane with posts lines the right curb, and the parked cars are in an off-street lot.",
    "box": {
@@ -896,7 +895,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77829181885421,
@@ -905,10 +905,10 @@
    "heading": 160.32009469476793,
    "date": "2025-10",
    "photoUrl": "/api/streetview/photo?pano=lS8kcdLR2K6MircX8RgmUw&heading=160",
-   "allowed": "no",
    "kind": "freeway, no curb",
    "reason": "This is an elevated freeway with a concrete barrier; no parking curb exists.",
-   "box": null
+   "box": null,
+   "status": "cant_park"
   },
   {
    "lat": 37.77799664872192,
@@ -917,7 +917,6 @@
    "heading": 160.19442562946358,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=ZBmnwqYcsa-yKSZg5H-2Eg&heading=160",
-   "allowed": "no",
    "kind": "intersection crosswalk",
    "reason": "The right curb near the camera is at an intersection corner and crosswalk, where parking is not allowed.",
    "box": {
@@ -925,7 +924,8 @@
     "y": 0.52,
     "w": 0.32,
     "h": 0.12
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.7777475567809,
@@ -934,7 +934,6 @@
    "heading": 159.4310475746662,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=vX3wFy9tFYnZCGs6KosaDg&heading=159",
-   "allowed": "no",
    "kind": "bike lane buffer",
    "reason": "The right curb is a protected bike lane with posts and a hatched buffer; cars park farther ahead, outside the bike lane.",
    "box": {
@@ -942,7 +941,8 @@
     "y": 0.5,
     "w": 0.7,
     "h": 0.5
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77749864718756,
@@ -951,7 +951,6 @@
    "heading": 159.4310475746662,
    "date": "2025-01",
    "photoUrl": "/api/streetview/photo?pano=uB57c0_Z03iL2MC44YKA1A&heading=159",
-   "allowed": "unsure",
    "kind": "curb, no signs",
    "reason": "There is a wide curb lane with green paint patches, but no readable parking signs or meters are visible.",
    "box": {
@@ -959,7 +958,8 @@
     "y": 0.5,
     "w": 0.45,
     "h": 0.2
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.7772090109501,
@@ -968,7 +968,6 @@
    "heading": 160.41030143127688,
    "date": "2025-05",
    "photoUrl": "/api/streetview/photo?pano=blU_OfdAlQZRRRymalPA1w&heading=160",
-   "allowed": "no",
    "kind": "bike lane construction",
    "reason": "The curb is lined with a bike lane, and construction barricades are blocking the curb lane.",
    "box": {
@@ -976,7 +975,8 @@
     "y": 0.5,
     "w": 0.67,
     "h": 0.5
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77695434919656,
@@ -985,7 +985,6 @@
    "heading": 166.33876019026678,
    "date": "2025-05",
    "photoUrl": "/api/streetview/photo?pano=lAit7UM4oB468fNsHmTRpA&heading=166",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "A green-marked bike lane runs along the right curb, with no parking lane.",
    "box": {
@@ -993,7 +992,8 @@
     "y": 0.5,
     "w": 0.7,
     "h": 0.5
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77671706812555,
@@ -1002,7 +1002,6 @@
    "heading": 159.72909642468005,
    "date": "2025-05",
    "photoUrl": "/api/streetview/photo?pano=P6AY5bcS_4yA0sgsyiIYRQ&heading=160",
-   "allowed": "no",
    "kind": "red curb",
    "reason": "Corner at a crosswalk with red-painted curb along the right side and no parking lane.",
    "box": {
@@ -1010,7 +1009,8 @@
     "y": 0.55,
     "w": 0.5,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.7767118453505,
@@ -1019,7 +1019,6 @@
    "heading": 69.9594951344015,
    "date": "2025-04",
    "photoUrl": "/api/streetview/photo?pano=t3NA-d0mb-g_pHKioQdVoA&heading=70",
-   "allowed": "yes",
    "kind": "free parking",
    "reason": "Cars are parked in a striped parking lane along the right curb beyond a bike lane, with no red paint visible.",
    "box": {
@@ -1027,7 +1026,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.3
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.7769676370228,
@@ -1036,7 +1036,6 @@
    "heading": 70.20773142767604,
    "date": "2025-04",
    "photoUrl": "/api/streetview/photo?pano=sGo9ZMtw3acscIXd4A6V-Q&heading=70",
-   "allowed": "yes",
    "kind": "parking lane",
    "reason": "A continuous row of cars is parked along the right curb in a marked parking lane.",
    "box": {
@@ -1044,7 +1043,8 @@
     "y": 0.45,
     "w": 0.6,
     "h": 0.4
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.77722134866714,
@@ -1053,7 +1053,6 @@
    "heading": 70.03305674646401,
    "date": "2025-04",
    "photoUrl": "/api/streetview/photo?pano=ExRox1HiPqV5DSOnULIP2w&heading=70",
-   "allowed": "yes",
    "kind": "parking lane",
    "reason": "Cars are parked along the right curb in a marked lane with no restrictions visible.",
    "box": {
@@ -1061,7 +1060,8 @@
     "y": 0.45,
     "w": 0.6,
     "h": 0.45
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.7774870014976,
@@ -1070,7 +1070,6 @@
    "heading": 70.03305674646401,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=5L6FJnpwLLMEGJzhLbEZAA&heading=70",
-   "allowed": "yes",
    "kind": "parking lane",
    "reason": "Cars are parked along the right curb beside the bike lane; the sign ahead is unreadable but parking appears normal.",
    "box": {
@@ -1078,7 +1077,8 @@
     "y": 0.45,
     "w": 0.6,
     "h": 0.45
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.77774015177926,
@@ -1087,7 +1087,6 @@
    "heading": 70.03305674646401,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=qnOEasdJkPJ5BoU5BnYrHg&heading=70",
-   "allowed": "no",
    "kind": "red curb",
    "reason": "The curb near the fire hydrant is painted red with no cars parked along it.",
    "box": {
@@ -1095,7 +1094,8 @@
     "y": 0.5,
     "w": 0.5,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77801766118883,
@@ -1104,7 +1104,6 @@
    "heading": 70.03305674646401,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=d8MqT8YskE6QvtP3IFwPLQ&heading=70",
-   "allowed": "no",
    "kind": "bike share station",
    "reason": "The right curb is taken up by a bike-share dock and a bus/transit area, with no parking lane.",
    "box": {
@@ -1112,7 +1111,8 @@
     "y": 0.55,
     "w": 0.55,
     "h": 0.45
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77821952903489,
@@ -1121,7 +1121,6 @@
    "heading": 70.46066432896492,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=Sp5EWaG17isQ_6EyGUn_yA&heading=70",
-   "allowed": "no",
    "kind": "crosswalk",
    "reason": "This is an intersection corner with crosswalks and a red-painted curb.",
    "box": {
@@ -1129,7 +1128,8 @@
     "y": 0.6,
     "w": 0.45,
     "h": 0.3
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77849342631989,
@@ -1138,7 +1138,6 @@
    "heading": 70.04909498284826,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=tk1t6wCEPGuKVL0vvuhjFw&heading=70",
-   "allowed": "yes",
    "kind": "parking lane",
    "reason": "Cars are parked along the right curb, with a marked parking lane and no visible red paint.",
    "box": {
@@ -1146,7 +1145,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.77875112607627,
@@ -1155,7 +1155,6 @@
    "heading": 69.95344571997748,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=pancLRgYD7mv2egAmKiLHA&heading=70",
-   "allowed": "yes",
    "kind": "metered parking",
    "reason": "Cars are parked at a marked parking lane with a meter post and a blue sign on the right curb.",
    "box": {
@@ -1163,7 +1162,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.77899859215624,
@@ -1172,7 +1172,6 @@
    "heading": 70.04265116939445,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=pidqHAxGcLHFEdPlW2z6jw&heading=70",
-   "allowed": "yes",
    "kind": "metered parking",
    "reason": "The right curb has a marked stall with T-lines and parking signage, and a car is parked ahead.",
    "box": {
@@ -1180,7 +1179,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.77924920799676,
@@ -1189,7 +1189,6 @@
    "heading": 70.04265116939445,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=Lg9Ay_QNn-mDJpbiWNF0YQ&heading=70",
-   "allowed": "unsure",
    "kind": "parking lane",
    "reason": "There are marked stalls with parked cars, but the curb near the pole looks red and the signs can't be read.",
    "box": {
@@ -1197,7 +1196,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.77951134179651,
@@ -1206,7 +1206,6 @@
    "heading": 70.2204277161498,
    "date": "2025-02",
    "photoUrl": "/api/streetview/photo?pano=B7s1RioNeLyukNOpCdhwsg&heading=70",
-   "allowed": "yes",
    "kind": "parking lane",
    "reason": "Cars are parked along the right curb in a marked parking lane with a posted sign, and no red paint is visible.",
    "box": {
@@ -1214,7 +1213,8 @@
     "y": 0.45,
     "w": 0.55,
     "h": 0.4
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.77977045488099,
@@ -1223,7 +1223,6 @@
    "heading": 70.42227136277836,
    "date": "2025-04",
    "photoUrl": "/api/streetview/photo?pano=SOFUeNPFxwUXAkR_H6oA0w&heading=70",
-   "allowed": "no",
    "kind": "loading zone",
    "reason": "The van is parked in a curb zone that looks like a loading or bike-lane area, and part of the curb appears painted.",
    "box": {
@@ -1231,7 +1230,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78003981482823,
@@ -1240,7 +1240,6 @@
    "heading": 70.42227136277836,
    "date": "2025-04",
    "photoUrl": "/api/streetview/photo?pano=Z8Zb4YP3t2lfH3qCmX-e8w&heading=70",
-   "allowed": "no",
    "kind": "crosswalk / red curb",
    "reason": "The right side is an intersection with a crosswalk and a red-painted corner curb.",
    "box": {
@@ -1248,7 +1247,8 @@
     "y": 0.48,
     "w": 0.55,
     "h": 0.2
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78029680475846,
@@ -1257,7 +1257,6 @@
    "heading": 70.02523073722477,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=DMNGJMXOCzXkvQRNa21e8Q&heading=70",
-   "allowed": "yes",
    "kind": "free parking",
    "reason": "Cars are parked along the right curb beyond the crosswalk, with no red paint or restriction signs visible.",
    "box": {
@@ -1265,7 +1264,8 @@
     "y": 0.45,
     "w": 0.28,
     "h": 0.12
-   }
+   },
+   "status": "free_to_park"
   },
   {
    "lat": 37.78055323612663,
@@ -1274,7 +1274,6 @@
    "heading": 69.53548167726888,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=SXPEpndD52xoLFQQuF5A1Q&heading=70",
-   "allowed": "unsure",
    "kind": "empty curb",
    "reason": "The long right curb is empty and no signs or paint can be read, so the empty curb may be restricted.",
    "box": {
@@ -1282,7 +1281,8 @@
     "y": 0.45,
     "w": 0.45,
     "h": 0.15
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78081044930759,
@@ -1291,7 +1291,6 @@
    "heading": 69.53548167726888,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=gAdQ-olKfTWGjaxjiI5RLw&heading=70",
-   "allowed": "unsure",
    "kind": "empty curb",
    "reason": "The right curb is empty except for one distant car, and no signs can be read.",
    "box": {
@@ -1299,7 +1298,8 @@
     "y": 0.42,
     "w": 0.45,
     "h": 0.15
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78103258265412,
@@ -1308,7 +1308,6 @@
    "heading": 69.915604438976,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=lUAODB8mnULEvzMHIliIww&heading=70",
-   "allowed": "no",
    "kind": "no parking lane",
    "reason": "Right curb has no parked cars and appears to be a striped travel/bike lane with signage, no meters visible.",
    "box": {
@@ -1316,7 +1315,8 @@
     "y": 0.48,
     "w": 0.4,
     "h": 0.12
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78129162134032,
@@ -1325,7 +1325,6 @@
    "heading": 69.915604438976,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=imtbIJVZBbfTx2Evx2Z2Ag&heading=70",
-   "allowed": "no",
    "kind": "no parking lane",
    "reason": "Right curb is empty with a bike lane stripe and scooters; no meters or parked cars.",
    "box": {
@@ -1333,7 +1332,8 @@
     "y": 0.47,
     "w": 0.45,
     "h": 0.12
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.781552055746,
@@ -1342,7 +1342,6 @@
    "heading": 69.88870744946536,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=Hh0g1XndK0VnQSvKjAjS4g&heading=70",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "Right curb next to green-marked bike lane with no parked cars or meters.",
    "box": {
@@ -1350,7 +1349,8 @@
     "y": 0.47,
     "w": 0.45,
     "h": 0.15
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78181168244229,
@@ -1359,7 +1359,6 @@
    "heading": 70.28192797802404,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=IQNzLMazrSrgBf8AJUw-Pw&heading=70",
-   "allowed": "no",
    "kind": "intersection crosswalk",
    "reason": "View is across an intersection with crosswalks; no usable right curb nearby.",
    "box": {
@@ -1367,7 +1366,8 @@
     "y": 0.48,
     "w": 0.4,
     "h": 0.06
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78205029050342,
@@ -1376,7 +1376,6 @@
    "heading": 340.6146242030993,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=csgMA2rJnBoW8pdti835cA&heading=341",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "Right curb has a green bike lane and no parked cars along it.",
    "box": {
@@ -1384,7 +1383,8 @@
     "y": 0.5,
     "w": 0.4,
     "h": 0.15
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.78230840567717,
@@ -1393,7 +1393,6 @@
    "heading": 340.4486094259914,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=XEmsQQ0v7sSiv5qi3vOj2w&heading=340",
-   "allowed": "no",
    "kind": "bike lane",
    "reason": "Green-painted bike lane runs along the right curb, so no parking.",
    "box": {
@@ -1401,7 +1400,8 @@
     "y": 0.55,
     "w": 0.4,
     "h": 0.2
-   }
+   },
+   "status": "cant_park"
   },
   {
    "lat": 37.7824093249944,
@@ -1410,7 +1410,6 @@
    "heading": 249.59302892494665,
    "date": "2026-09",
    "photoUrl": "/api/streetview/photo?pano=uTiyLpyHk_up4nmEluc-sQ&heading=250",
-   "allowed": "no",
    "kind": "no parking sign",
    "reason": "A 'No Ball Park Parking' sign stands at a corner with a crosswalk and curb bulb-out, and cones and caution tape block the right curb.",
    "box": {
@@ -1418,7 +1417,8 @@
     "y": 0.5,
     "w": 0.55,
     "h": 0.35
-   }
+   },
+   "status": "cant_park"
   }
  ],
  "builtAt": "2026-10-11T21:02:54.009Z",

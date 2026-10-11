@@ -11,7 +11,7 @@ export type CurbFrame = {
   heading: number;
   date: string;
   photoUrl: string;
-  allowed: "yes" | "no" | "unsure";
+  status: "free_to_park" | "cant_park" | "occupied";
   kind: string;
   reason: string;
   box: { x: number; y: number; w: number; h: number } | null;
@@ -24,9 +24,9 @@ export const PARKING_ZONE_WALK_MIN = 10;
 const PRELOAD_AHEAD = 4;
 
 const TONE = {
-  yes: { border: "border-success", fill: "bg-success/20", chip: "bg-success text-black", title: "Street parking" },
-  no: { border: "border-destructive", fill: "bg-destructive/15", chip: "bg-destructive text-white", title: "No parking" },
-  unsure: { border: "border-amber-400", fill: "bg-amber-400/15", chip: "bg-amber-400 text-black", title: "Check the signs" },
+  free_to_park: { border: "border-success", fill: "bg-success/20", chip: "bg-success text-black", title: "Free to park", bar: "bg-success" },
+  cant_park: { border: "border-destructive", fill: "bg-destructive/15", chip: "bg-destructive text-white", title: "Can't park", bar: "bg-destructive/80" },
+  occupied: { border: "border-amber-400", fill: "bg-amber-400/15", chip: "bg-amber-400 text-black", title: "Occupied", bar: "bg-amber-400" },
 } as const;
 
 /** "2024-05" → "May 2024". */
@@ -57,7 +57,7 @@ export function StreetJourney({
   const touchX = useRef<number | null>(null);
   const frame = frames[index];
   const inZone = frame.walkMin <= PARKING_ZONE_WALK_MIN;
-  const tone = TONE[frame.allowed];
+  const tone = TONE[frame.status];
 
   useEffect(() => {
     if (!playing) return;
@@ -157,7 +157,7 @@ export function StreetJourney({
               onClick={() => go(i)}
               className={cn(
                 "h-full flex-1",
-                f.walkMin > PARKING_ZONE_WALK_MIN ? "bg-white/25" : f.allowed === "yes" ? "bg-success" : f.allowed === "no" ? "bg-destructive/80" : "bg-amber-400",
+                f.walkMin > PARKING_ZONE_WALK_MIN ? "bg-white/25" : TONE[f.status].bar,
                 i === index ? "outline-2 outline-white" : i > index && "opacity-50",
               )}
             />
