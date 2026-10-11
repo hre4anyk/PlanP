@@ -36,7 +36,9 @@ src/                         Next.js app (Netlify)
   app/
     page.tsx                 landing page (links to both modes + waitlist QR)
     me/page.tsx              Park me (camera), client-side
-    car/page.tsx             Park my car (map), client-side
+    car/page.tsx             Park my car: tabs for Street spot (camera) and Garage plan (map)
+    car/street-finder.tsx    dashboard camera, live vehicle boxes, Claude street checks
+    car/car-modes.tsx        street first, garages as backup
     api/look/route.ts        Claude Opus 5.5 photo checks: describe driver, is-this-the-driver
     api/voice-key/route.ts   mint a short-lived OpenAI Realtime key
     api/engine/[...path]/route.ts   pass-through to the Anbaric app (ENGINE_URL)
@@ -161,7 +163,14 @@ The phone is **held**, not on a stand, so seats are pinned to directions in the 
 5. **Occupancy:** while a pinned seat is in view, a `person` box covering ≥ 30% of its lower half for ≥ 1 s marks it taken; free after 2 s without.
 6. **Target taken:** "Was that you?" → **That's me** (Great landing) / **Someone else** (reroute to the next free seat, re-planned from what's free now). While walking, the person can also tap **I'm seated** or **It's taken**. Claude's identity check replaces the question in a later batch.
 
-### 6.2 Park my car: the 2-second reroute
+### 6.2 Park my car: street spot from the dashboard
+
+1. "Start looking": rear camera + on-device detector; every vehicle (`car`, `truck`, `bus`, `motorcycle`) outlined live.
+2. Every ~6 s while looking (first look 1.5 s in), or on "Check now": a snapshot with the vehicles **numbered** goes to `/api/look` mode `street`. Claude Opus 5.5 returns which numbers are parked at the curb, whether there's an open space long enough for a car, where, how far, whether it's legal right now, and the rules it saw.
+3. Open (or possibly open) spot → dashed box + spoken "Open spot on your right, about 15 metres" → **Park here** / **Taken, keep looking**.
+4. No luck → **Garage plan** switches to the A/B/C garage chain (6.3).
+
+### 6.3 Park my car: the 2-second garage reroute
 
 1. Trigger: the voice model calls `lot_full()`, or the button is tapped.
 2. **Instantly, in the browser:** mark the lot full, move to the next lot already in the chain, redraw the snake, voice announcement.
@@ -200,6 +209,7 @@ The phone is **held**, not on a stand, so seats are pinned to directions in the 
 | D7 | **Clerk removed**; no driver login in the demo | Not needed; was a deploy risk (pages break without its keys) | Keeping Clerk alongside Anbaric |
 | D8 | **Base44** for the waitlist | No-code, built by the founder in parallel; live traction in the demo | Building a waitlist in our app |
 | D9 | Handheld phone; seats pinned to room directions (orientation sensors) and snapped to live detections | The person walks with the phone; iPhone web has no AR, this is the reliable middle ground | Fixed stand (founder tested handheld: screen-locked boxes broke as soon as the phone moved); photo-map (founder chose live view + arrow) |
+| D16 | Street parking first, garage chain as backup; Claude judges open + legal from a numbered snapshot every ~6 s | Cars are easy for the on-device model, legality (hydrants, curbs, signs) needs Claude; one story with the garage chain | Detector-only gap finding (can't judge legality); third-party feeds (none live and open today, see PRD) |
 | D15 | Claude checks every scan through numbered boxes ("set of marks") | The small detector over-counts chairs in busy rooms (bags, laptops, people); Claude is accurate and only runs once per scan | Detector only; Claude finding boxes from scratch (less precise boxes) |
 | D10 | Driver identified by clothing description, no faces, nothing stored | Enough to tell two people apart on stage; privacy-safe | Face recognition |
 | D11 | Distance as steps from the chair's size in the picture | Good enough (±30%) for "about six steps" | WebXR depth (not on iOS Safari) |

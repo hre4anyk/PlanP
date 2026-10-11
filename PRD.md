@@ -112,6 +112,8 @@ Build the thinnest working version of **both modes**, end to end, today:
 | Distance to a chair | Estimated from how big the chair looks in the picture. Rough (±30%), so shown as **steps** ("about six steps") plus left/right/ahead. |
 | Car parking data | **Fake data**: 12 real SF garages with made-up availability and rules |
 | How we know a lot is full (car) | **Voice** ("it's full") or the **big button** |
+| Street parking (car) | **Street first, garages as backup** (decided 2026-10-11). Phone on the dashboard: the on-device detector outlines vehicles live; every ~6 s (or "Check now") Claude looks at one frame with the vehicles numbered and says which are parked, whether there's an open curb space, and whether it's legal (hydrant, driveway, coloured curb, signs). No luck → one tap to the garage Plan A/B/C. |
+| Third-party camera data | Researched 2026-10-11: Waymo publishes research datasets only (no live feed); Tesla's Fleet API has no camera access; **Nexar CityStream** offers live dashcam detections incl. free parking spaces (enterprise API). Not used today; Plan P's own phones are the camera network, Nexar is a partner option. |
 | Speed promise | Reroutes happen **instantly in the browser** from the chain already on screen. Claude's re-plan and the Anbaric record follow in the background. |
 | Map, routes | OpenStreetMap via Leaflet; OSRM public server. Free, no keys. |
 | Showing the phone to the room | Mirror the iPhone to the Mac with AirPlay, Mac on the projector |
@@ -304,6 +306,15 @@ Prices used: Claude Opus 5.5 $4 in / $20 out per 1M tokens. gpt-realtime-2.1-min
 | Plan + re-plan | Claude Opus 5.5 | 2 × (~4k in, ~1.5k out, effort `low`) | ~$0.092 |
 | Conversation | gpt-realtime-2.1-mini | ~1 min listening, ~1 min speaking, plus instructions | ~$0.035 |
 | **Total** | | | **≈ $0.13** |
+
+**Street search**: about 3 minutes of driving with a Claude look every ~6 s.
+
+| Step | Model | Usage | Cost |
+|---|---|---|---|
+| Vehicle detection | on-device detector | every frame | **$0** |
+| Street checks | Claude Opus 5.5 | ~30 looks × (~1.2k in incl. a small photo, ~200 out) | ~$0.26 |
+
+Easy saving later: only send a frame when the detector sees a gap between parked cars, which cuts looks by most of that.
 
 **Park me**: one 2-minute session.
 

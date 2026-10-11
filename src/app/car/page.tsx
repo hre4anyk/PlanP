@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { CarApp } from "./car-app";
+import { CarModes } from "./car-modes";
 
 export const metadata: Metadata = {
   title: "Park my car — Plan P",
-  description: "Your backup parking chain near your meeting: Plan A, B and C, ready before you leave.",
+  description: "Find an open street spot with your phone camera, with garage Plan A, B and C as the backup.",
 };
 
 export default function CarPage() {
-  return <CarApp />;
+  return <CarModes />;
 }

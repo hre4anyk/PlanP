@@ -89,7 +89,7 @@ export function CarApp() {
   const rerouted = (trip?.fullIds.length ?? 0) > 0;
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col lg:flex-row">
+    <div className="flex h-full flex-col lg:flex-row">
       <div className="relative min-h-0 flex-1">
         <MapView
           lots={lots}
