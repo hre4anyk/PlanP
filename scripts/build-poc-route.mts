@@ -17,7 +17,7 @@ const path = route.legs.flatMap((l) => l.path);
 const points = sampleStretch(path, MEETING, { spacingM: 40, maxWalkMin: 999, maxPoints: 80 });
 console.log(`route: ${route.legs[0].driveMin} min, ${path.length} path points, ${points.length} samples`);
 
-const frames: { photoUrl: string; allowed: string }[] = [];
+const frames: { photoUrl: string; status: string }[] = [];
 let cost = 0;
 for (let i = 0; i < points.length; i += 20) {
   const res = await fetch(`${APP}/api/curb`, {
@@ -38,5 +38,5 @@ writeFileSync(
   "src/data/poc-route.json",
   JSON.stringify({ start: START, meeting: MEETING, driveMin: route.legs[0].driveMin, path, frames: unique, builtAt: new Date().toISOString(), buildCostUsd: Number(cost.toFixed(3)) }, null, 1),
 );
-const tally = (k: string) => unique.filter((f) => f.allowed === k).length;
-console.log(`saved ${unique.length} frames: ${tally("yes")} parking, ${tally("no")} no parking, ${tally("unsure")} unsure; cost $${cost.toFixed(2)}`);
+const tally = (k: string) => unique.filter((f) => f.status === k).length;
+console.log(`saved ${unique.length} frames: ${tally("free_to_park")} free to park, ${tally("cant_park")} can't park, ${tally("occupied")} occupied; cost $${cost.toFixed(2)}`);

@@ -56,7 +56,6 @@ export function StreetJourney({
   const [playing, setPlaying] = useState(autoStart);
   const touchX = useRef<number | null>(null);
   const frame = frames[index];
-  const inZone = frame.walkMin <= PARKING_ZONE_WALK_MIN;
   const tone = TONE[frame.status];
 
   useEffect(() => {
@@ -86,7 +85,7 @@ export function StreetJourney({
       <div className="relative w-full shrink-0" style={{ aspectRatio: "16 / 10" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- proxied Street View photo, sized by the frame */}
         <img key={frame.photoUrl} src={frame.photoUrl} alt={`Street View, ${tone.title.toLowerCase()}: ${frame.kind}`} className="absolute inset-0 h-full w-full object-cover" />
-        {inZone && frame.box && (
+        {frame.box && (
           <div
             className={cn("absolute rounded-md border-4 border-dashed", tone.border, tone.fill)}
             style={{ left: `${frame.box.x * 100}%`, top: `${frame.box.y * 100}%`, width: `${frame.box.w * 100}%`, height: `${frame.box.h * 100}%` }}
@@ -109,24 +108,12 @@ export function StreetJourney({
 
       {/* The verdict, under the photo, big enough to read at a glance */}
       <div className="flex flex-col gap-1 px-4 py-3">
-        {inZone ? (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={cn("rounded-md px-2.5 py-0.5 text-sm font-bold", tone.chip)}>{tone.title}</span>
-              <span className="text-base font-medium text-white">{frame.kind}</span>
-              <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk</span>
-            </div>
-            <p className="text-sm leading-snug text-white/70">{frame.reason}</p>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-white/15 px-2.5 py-0.5 text-sm font-bold text-white">Driving</span>
-              <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk from the meeting</span>
-            </div>
-            <p className="text-sm leading-snug text-white/70">Parking check starts {PARKING_ZONE_WALK_MIN} minutes&apos; walk from the door.</p>
-          </>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn("rounded-md px-2.5 py-0.5 text-sm font-bold", tone.chip)}>{tone.title}</span>
+          <span className="text-base font-medium text-white">{frame.kind}</span>
+          <span className="ml-auto text-lg font-bold whitespace-nowrap text-white">{frame.walkMin} min walk</span>
+        </div>
+        <p className="text-sm leading-snug text-white/70">{frame.reason}</p>
 
         <div className="flex items-center gap-2 pt-1.5">
           <button type="button" aria-label="Previous photo" onClick={() => go(index - 1)} disabled={index === 0} className="h-10 w-10 shrink-0 rounded-full bg-white/15 text-xl text-white disabled:opacity-30">
@@ -157,7 +144,7 @@ export function StreetJourney({
               onClick={() => go(i)}
               className={cn(
                 "h-full flex-1",
-                f.walkMin > PARKING_ZONE_WALK_MIN ? "bg-white/25" : TONE[f.status].bar,
+                TONE[f.status].bar,
                 i === index ? "outline-2 outline-white" : i > index && "opacity-50",
               )}
             />

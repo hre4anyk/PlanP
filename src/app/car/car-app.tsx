@@ -264,7 +264,7 @@ export function CarApp() {
                   <button type="button" onClick={() => setParked(true)} className="rounded-md bg-success px-3 py-1 text-sm font-bold text-black">
                     Garage {trip.chain[trip.currentIndex]?.label} is Free
                   </button>
-                  <button type="button" onClick={() => setTrip(markCurrentFull(trip, destination, LOTS))} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
+                  <button type="button" onClick={() => { setTrip(markCurrentFull(trip, destination, LOTS)); setJourney({ status: "idle" }); }} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
                     Occupied →
                   </button>
                 </div>
