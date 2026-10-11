@@ -1,88 +1,54 @@
-import Link from "next/link";
-import { Show, SignUpButton } from "@clerk/nextjs";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { AgentCharacter } from "@/components/agent-character";
-import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { SnakeRoute } from "@/components/snake-route";
 
 const steps = [
   {
     n: "01",
-    title: "Upload your CV",
-    body: "A recruiter-grade summary in about 15 seconds. No buzzwords — only what's actually on the page.",
+    title: "Pick your meeting",
+    body: "Choose where you need to be. Plan P finds the garages within a short walk of the door.",
   },
   {
     n: "02",
-    title: "Add the AI sessions you're proud of",
-    body: "One command exports a Claude Code chat. Every feature, tool or integration you built is credited once. Re-uploading the same work earns nothing.",
+    title: "Get your backup chain",
+    body: "Plan A, B and C, ranked by shortest walk, drawn as one route. Your backups are planned before you leave.",
   },
   {
     n: "03",
-    title: "Get found. Get paid.",
-    body: "Recruiters see a card: name, city, one-line superpower, score. To read the rest, their agent pays yours.",
+    title: "Lot full? One tap.",
+    body: "Hit the big button and keep driving. The route already continues to Plan B. No new search, no detour.",
   },
 ];
 
-const onchain = [
-  { title: "A wallet the moment you sign up", body: "Created and funded for you. No seed phrases, no extensions." },
-  { title: "100 ACDC to start", body: "Claim once. Spend it unlocking the people you want to hire." },
-  { title: "A 1-of-1 profile NFT", body: "Rewritten on-chain every time your score moves. Anyone can verify the history." },
-  { title: "Paid to be read", body: "Set your price. Unlocks go straight to your wallet — your agent never spends past your limit." },
+const calm = [
+  { title: "One big button", body: "Sized for a thumb, not a fingertip. One action on screen at a time." },
+  { title: "It talks to you", body: "“Plan A is full. Heading to Plan B.” You keep your eyes on the road." },
+  { title: "Your maps app, your call", body: "Open turn-by-turn directions in Apple Maps or Google Maps at any point." },
+  { title: "Never runs out", body: "If every lot is full, the chain grows. Plan D, E and F get added to the end." },
 ];
-
-function PrimaryCta({ label }: { label: string }) {
-  return (
-    <>
-      <Show when="signed-out">
-        <SignUpButton mode="modal">
-          <Button size="lg">{label}</Button>
-        </SignUpButton>
-      </Show>
-      <Show when="signed-in">
-        <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>
-          Open my profile
-        </Link>
-      </Show>
-    </>
-  );
-}
 
 export default function Home() {
   return (
     <div className="overflow-hidden">
       {/* Hero */}
       <section className="relative">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-48 left-1/2 h-[600px] w-[800px] -translate-x-1/2"
-          style={{ background: "radial-gradient(ellipse, rgba(255,77,46,0.15) 0%, transparent 70%)" }}
-        />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-4 px-4 pt-20 pb-24 sm:px-6 sm:pt-28 sm:pb-32 lg:grid-cols-[1.35fr_0.65fr]">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-          <p className="eyebrow">For people who don&apos;t fit one job title</p>
-          <h1 className="mt-6 max-w-4xl text-5xl leading-[1.02] font-bold sm:text-6xl lg:text-[4.25rem]">
-            Your CV shows where you worked.{" "}
-            <span className="text-primary">Your AI chats show how you work.</span>
-          </h1>
-          <p className="mt-8 hidden max-w-2xl text-lg leading-relaxed text-muted-foreground sm:block">
-            ACDC AI reads the Claude and ChatGPT sessions you&apos;re proud of, credits every feature you
-            actually built, and turns it into a profile a recruiter reads in 30 seconds.
-          </p>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground sm:hidden">
-            Turn the AI sessions you&apos;re proud of into a profile recruiters read in 30 seconds.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            <PrimaryCta label="Build my profile" />
-            <a href="#how" className={cn(buttonVariants({ variant: "ghost", size: "lg" }))}>
-              How it works
-            </a>
+            <p className="eyebrow">For drivers with somewhere to be</p>
+            <h1 className="mt-6 max-w-3xl text-balance text-5xl leading-[1.02] font-bold sm:text-6xl lg:text-[4.25rem]">
+              The lot is full. <span className="text-primary">You already have Plan B.</span>
+            </h1>
+            <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground">
+              Plan P lines up backup parking before you leave. If your garage is full, tap once and keep
+              driving to the next one.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <a href="#how" className={buttonVariants({ size: "lg" })}>
+                See how it works
+              </a>
+            </div>
+            <p className="mt-6 text-sm text-subtle">Runs in your phone&apos;s browser. Nothing to install.</p>
           </div>
-          <p className="mt-6 text-sm text-subtle">Free. Private by default. You decide who reads the rest.</p>
-          </div>
-          <AgentCharacter
-            interactive
-            label="Your ACDC agent — click to say hi"
-            className="mx-auto mt-6 size-[260px] sm:size-[320px] lg:mt-0 lg:h-[480px] lg:w-full"
-          />
+          <SnakeRoute className="mx-auto w-full max-w-[360px] lg:max-w-[440px]" />
         </div>
       </section>
 
@@ -90,14 +56,18 @@ export default function Home() {
       <section className="border-y border-border bg-surface">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-16 sm:px-6 md:grid-cols-2 md:gap-16 md:py-20">
           <h2 className="text-3xl leading-tight font-bold sm:text-4xl">
-            Recruiters screen logos and years. Not how you think.
+            Parking apps help you plan. Nothing helps when the plan fails.
           </h2>
           <div className="flex flex-col gap-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             <p>
-              Mixed careers, career switchers and people who ship with AI get filtered out before anyone
-              sees the work.
+              You&apos;re five minutes from a meeting and the garage is full. You can&apos;t search while
+              driving, so you circle. Every wrong turn makes you later.
             </p>
-            <p className="text-foreground">The evidence already exists. It&apos;s sitting in your chat history.</p>
+            <p>
+              San Francisco drivers lose 83 hours a year looking for parking. More than 4 in 10 Americans
+              have missed an appointment because they couldn&apos;t park.
+            </p>
+            <p className="text-xs text-subtle">Source: INRIX.</p>
           </div>
         </div>
       </section>
@@ -106,7 +76,7 @@ export default function Home() {
       <section id="how" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28">
         <p className="eyebrow">How it works</p>
         <h2 className="mt-4 max-w-2xl text-3xl leading-tight font-bold sm:text-4xl">
-          Three steps. The last one pays you.
+          Your backup is planned before you need it.
         </h2>
         <ol className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
           {steps.map((s) => (
@@ -119,20 +89,19 @@ export default function Home() {
         </ol>
       </section>
 
-      {/* On-chain */}
+      {/* Built for the bad moment */}
       <section className="border-t border-border bg-surface">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="grid gap-12 md:grid-cols-[1fr_1.4fr] md:gap-16">
             <div>
-              <p className="eyebrow">On Stellar</p>
-              <h2 className="mt-4 text-3xl leading-tight font-bold sm:text-4xl">Your agent handles the money.</h2>
+              <p className="eyebrow">Behind the wheel</p>
+              <h2 className="mt-4 text-3xl leading-tight font-bold sm:text-4xl">Built for the stressful minute.</h2>
               <p className="mt-5 leading-relaxed text-muted-foreground">
-                Every payment and every profile update is a public transaction. Don&apos;t trust us — check it
-                yourself.
+                Big text, few words, one thing to do. Plan P stays calm so you can too.
               </p>
             </div>
             <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
-              {onchain.map((f) => (
+              {calm.map((f) => (
                 <div key={f.title} className="border-l-2 border-primary/60 pl-5">
                   <dt className="font-medium text-foreground">{f.title}</dt>
                   <dd className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.body}</dd>
@@ -140,24 +109,23 @@ export default function Home() {
               ))}
             </dl>
           </div>
-          <p className="mt-12 text-xs text-subtle">Runs on the Stellar test network. Test tokens have no cash value.</p>
         </div>
       </section>
 
-      {/* Closing CTA */}
+      {/* Closing */}
       <section className="mx-auto max-w-6xl px-4 py-24 text-center sm:px-6 sm:py-32">
         <h2 className="mx-auto max-w-3xl text-4xl leading-tight font-bold sm:text-5xl">
-          Show the work. <span className="text-primary">Not the logo.</span>
+          Always have a <span className="text-primary">Plan P.</span>
         </h2>
-        <div className="mt-10 flex justify-center">
-          <PrimaryCta label="Build my profile — free" />
-        </div>
+        <p className="mx-auto mt-6 max-w-md text-muted-foreground">
+          Launching first in downtown San Francisco.
+        </p>
       </section>
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-8 text-xs text-subtle sm:px-6">
-          <span>ACDC AI</span>
-          <span>Built at AI Hacker House — Equinox Edition</span>
+          <span>Plan P</span>
+          <span>Parking data in this demo is simulated.</span>
         </div>
       </footer>
     </div>

@@ -38,7 +38,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ACDC AI brand (design.md): dark only, one accent (vermillion), green reserved for money in. */
+/* Plan P brand (design.md): dark only, one accent (vermillion). */
 :root {
   color-scheme: dark;
   --background: #0a0a0f;
@@ -99,5 +99,34 @@
   /* Small uppercase section label (design.md "Section Headers"). */
   .eyebrow {
     @apply text-xs font-medium uppercase tracking-[0.14em] text-subtle;
+  }
+
+  /* Landing snake: dashes flow toward the current lot; the lot pin breathes. */
+  .route-flow {
+    animation: route-flow 0.9s linear infinite;
+  }
+  .route-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: route-pulse 2.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .route-flow,
+    .route-pulse {
+      animation: none;
+    }
+  }
+}
+
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+@keyframes route-pulse {
+  50% {
+    transform: scale(1.35);
+    opacity: 0.05;
   }
 }

@@ -26,9 +26,9 @@ const satoshi = localFont({
 const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ACDC AI — proof of how you work with AI",
+  title: "Plan P — your backup parking, already planned",
   description:
-    "Your CV shows where you worked. Your AI sessions show how you work. ACDC AI turns them into a profile recruiters can read in 30 seconds.",
+    "Plan P lines up backup parking before you leave. If your garage is full, tap once and keep driving to the next one.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
