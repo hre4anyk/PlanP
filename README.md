@@ -12,35 +12,35 @@ Built for the Multi Model Hackathon (SF Tech Week, Oct 11 2026). Fully vibe-code
 
 ## Models
 
-| Job | Model |
-|---|---|
-| Find chairs and people in every camera frame (on the phone) | EfficientDet-Lite0 via MediaPipe (Google) |
-| Is that you or someone else? Is this seat really free? | Gemini 2.5 Flash (Google) |
-| Plan and re-plan the backup chain | Claude Opus 5.5 (Anthropic) |
-| Voice command → action | Claude Haiku 5.5 (Anthropic) |
-| Speech to text | gpt-4o-mini-transcribe (OpenAI) |
-| Text to speech | gpt-4o-mini-tts (OpenAI) |
+| Role | Model | Where it's called |
+|---|---|---|
+| Brain: plan the backup chain, photo checks ("is that the driver?") | Claude Opus 5.5 (Anthropic) | `engine/src/planner.ts`, `src/app/api/look/route.ts` |
+| Voice: speech-to-speech, calls Plan P actions as tools | gpt-realtime-2.1-mini (OpenAI) | `src/voice/realtime.ts` |
+| Camera watcher (on the phone, not an AI service) | MediaPipe EfficientDet-Lite0 | `src/vision/detector.ts` |
 
 ## Status
 
 - [x] Landing page
+- [x] Clerk removed (no login in the demo)
 - [ ] Batch 1 — car: map + fake garages + deterministic chain + tests
 - [ ] Batch 2 — car: snake route + "Lot is full" + chain extension
 - [ ] Batch 3 — Park me: camera + on-device detection + free/taken seats + A/B/C
-- [ ] Batch 4 — Claude planner (both modes) + model trace
-- [ ] Batch 5 — Gemini: "this is me", chair thief, Great landing
-- [ ] Batch 6 — voice (transcribe + Haiku intents + TTS)
-- [ ] Batch 7 — open in Maps + simulate drive + landing buttons
+- [ ] Batch 4 — Anbaric engine + Claude planner (both modes) + model trace
+- [ ] Batch 5 — Claude photo checks: "this is me", chair thief, Great landing
+- [ ] Batch 6 — voice (OpenAI Realtime with tools)
+- [ ] Batch 7 — open in Maps + simulate drive + landing buttons + waitlist QR
 - [ ] Batch 8 — rehearsal, video, submission
 
 ## Stack
 
 - **Framework:** Next.js 16 (TypeScript)
 - **UI:** [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS
-- **AI:** Anthropic, Google Gemini and OpenAI SDKs, called only from server route handlers
-- **Auth:** [Clerk](https://clerk.com) (wired up, not used by the demo yet)
+- **Backend:** [Anbaric](https://github.com/anbaric-ai/anbaric-cloud) app in `engine/` (audited state machines, Claude agent), hosted on Anbaric Cloud
+- **AI:** Claude (Anthropic) and OpenAI Realtime; keys stay on the server
+- **Waitlist:** Base44
 - **Database:** Supabase (wired up, not used by the demo yet)
-- **Hosting:** Netlify (see [DEPLOYMENT.md](DEPLOYMENT.md))
+- **Hosting:** Netlify for the web app, Anbaric Cloud for the engine (see [DEPLOYMENT.md](DEPLOYMENT.md))
+- **Code review:** Prelint on every pull request
 
 ## Getting started
 
@@ -48,4 +48,5 @@ Built for the Multi Model Hackathon (SF Tech Week, Oct 11 2026). Fully vibe-code
 cp .env.example .env.local   # then fill in the keys
 npm install
 npm run dev                  # http://localhost:3000
+# engine (from batch 4): PORT=4000 npx tsx engine/src/main.ts
 ```

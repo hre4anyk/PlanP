@@ -21,18 +21,15 @@ https://github.com/hre4anyk/PlanP
 
 ## Models used and why
 
-- **EfficientDet-Lite0 via MediaPipe (Google, runs on the phone): the fast eyes.** Finds chairs and people in every camera frame, 10+ times a second, for free. Only an on-device model is fast and cheap enough to watch continuously.
-- **Gemini 2.5 Flash (Google): the smart eyes.** Called only when something changes. Recognises whether the person who just sat in your chair is you or someone else (from a clothing description, no faces), and spots seats that look free but aren't (a bag on the chair). Fast, cheap multimodal reasoning.
-- **Claude Opus 5.5 (Anthropic): the planner.** Picks the backup chain and explains each choice in one sentence. For chairs: closest, unblocked, matching your wish ("near the window"). For garages: walk time vs. price, closing time vs. meeting length, height clearance, permit rules. The one hard reasoning step, so it gets the strongest model.
-- **Claude Haiku 5.5 (Anthropic): the reflex.** Turns speech ("find me a spot near the window", "ugh, it's full") into an action in well under a second, for a fraction of a cent.
-- **gpt-4o-mini-transcribe (OpenAI): the ears.** Speech to text that copes with background noise, about $0.003 per minute.
-- **gpt-4o-mini-tts (OpenAI): the voice.** Speaks every change of plan, calm in the car and playful in the room ("Great landing").
+- **Claude Opus 5.5 (Anthropic): the brain.** Picks the backup chain and explains each choice in one sentence: for chairs, closest, unblocked and matching your wish ("near the window"); for garages, walk time vs. price, closing time vs. meeting length, height clearance and permit rules. It also reads photos: when someone sits in your chair, it decides whether that's you or someone else (from a clothing description, no faces). It's the strongest reasoner with vision, and it's called only when something changes.
+- **OpenAI gpt-realtime-2.1-mini (OpenAI): the voice.** Speech in and speech out in one model, fast and interruptible, so a stressed driver can just talk. It turns "find me a spot" or "ugh, it's full" into tool calls on Plan P, and speaks every change of plan. The mini version keeps voice to a few cents per session.
+- Plus a free on-device vision tool (MediaPipe object detector) that watches the camera for chairs and people, so neither AI model has to look at every frame.
 
 ## Why multiple models beat multiple apps
 
-The value is in the hand-off between models, inside one loop that runs in a couple of seconds. The on-device detector sees a person sit in your Plan A chair instantly, but can't tell who it is. Gemini can, but it's too slow and costly to run on every frame. So the detector notices the change and Gemini is asked one precise question at exactly that moment. Then Claude decides what happens next and the voice tells you, so you never look at a screen. Separate apps would each need you to stop, look and tap; one system makes the reroute hands-free.
+A voice isn't a brain, and a brain isn't a voice. The speech-to-speech model gives a natural, interruptible conversation but isn't the strongest at weighing prices, closing times and rules; Claude is, but it can't hold a live spoken conversation. In Plan P the voice model calls Claude as a tool mid-conversation, so the driver gets Claude's judgement at the speed of speech. The same goes for watching: the on-device detector notices instantly that someone sat in your Plan A chair but can't tell who it is, so Claude is asked one precise question at exactly that moment. Separate apps would each make you stop, look and tap. One system makes the reroute hands-free. Every decision, and which model made it, is recorded as an audited workflow on Anbaric.
 
-Each model also runs where it's cheapest: free on-device detection for every frame, cheap Gemini and Haiku for frequent questions, Opus only for the rare hard decision. A Park me session costs about $0.08 and a car trip about $0.11 at standard list prices.
+A Park me session costs about $0.08 and a car trip about $0.13 at standard list prices.
 
 ## Team contributions
 

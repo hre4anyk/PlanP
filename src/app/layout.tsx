@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { JetBrains_Mono } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { dark } from "@clerk/themes";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -35,20 +33,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${clash.variable} ${satoshi.variable} ${mono.variable} h-full`}>
       <body className="flex min-h-full flex-col">
-        <ClerkProvider
-          appearance={{
-            theme: dark,
-            variables: {
-              colorPrimary: "#ff4d2e",
-              colorBackground: "#111116",
-              fontFamily: "var(--font-satoshi), sans-serif",
-              borderRadius: "0.5rem",
-            },
-          }}
-        >
-          <SiteHeader />
-          <main className="flex-1">{children}</main>
-        </ClerkProvider>
+        <SiteHeader />
+        <main className="flex-1">{children}</main>
       </body>
     </html>
   );
