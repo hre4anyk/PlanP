@@ -2,17 +2,18 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PARKING_ZONE_WALK_MIN, StreetJourney, type CurbFrame } from "@/components/street-journey";
+import { StreetJourney, type CurbFrame } from "@/components/street-journey";
 import poc from "@/data/poc-route.json";
 import { Button } from "@/components/ui/button";
 import { DEMO_START, LOTS, formatClearance, type LatLng } from "@/data/lots";
 import { nearestOpenLot } from "@/logic/chain";
 import { arrival, clock, meetingAt, spareText } from "@/logic/eta";
-import { distanceMetres, walkDistanceText, walkMinutes } from "@/logic/geo";
+import { walkMinutes } from "@/logic/geo";
 import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { RoutePlanBar } from "@/components/route-plan-bar";
+import { SpotList } from "@/components/spot-list";
 import { appleMapsUrl, googleMapsUrl } from "@/logic/maps";
 import { cn } from "@/lib/utils";
 
@@ -351,33 +352,15 @@ export function CarApp() {
             </div>
           )}
 
-          {journey.status === "ready" && (() => {
-            const freeSpots = journey.frames
-              .map((f, i) => ({ f, i }))
-              .filter(({ f }) => f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN);
-            const closest = destination ? freeSpots.reduce<CurbFrame | null>((best, { f }) => (
-              !best || distanceMetres(f, destination) < distanceMetres(best, destination) ? f : best
-            ), null) : null;
-            return (
-              <div className="order-1 flex flex-col gap-1">
-                <span className="eyebrow">Street parking on your way</span>
-                {freeSpots.length > 0 ? (
-                  <p className="text-sm">
-                    {freeSpots.length} spot{freeSpots.length > 1 ? "s" : ""} free to park
-                    {closest && destination ? ` — closest is ${walkDistanceText(closest, destination)}` : ""}.
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No free street parking within a {PARKING_ZONE_WALK_MIN}-minute walk. {trip?.exhausted ? "All garage backups are full." : `Head for Garage ${trip?.chain[trip.currentIndex]?.label ?? "A"}.`}
-                  </p>
-                )}
-                <span className="font-mono text-xs text-subtle">
-                  Claude + Street View · {journey.trace.photos} photos ·{" "}
-                  {journey.trace.precomputed ? `read once, $${journey.trace.costUsd.toFixed(2)}` : `${(journey.trace.ms / 1000).toFixed(1)} s · $${journey.trace.costUsd.toFixed(2)}`}
-                </span>
-              </div>
-            );
-          })()}
+          {journey.status === "ready" && (
+            <>
+              <SpotList frames={journey.frames} destination={destination} />
+              <span className="font-mono text-xs text-subtle">
+                Claude + Street View · {journey.trace.photos} photos ·{" "}
+                {journey.trace.precomputed ? `read once, $${journey.trace.costUsd.toFixed(2)}` : `${(journey.trace.ms / 1000).toFixed(1)} s · $${journey.trace.costUsd.toFixed(2)}`}
+              </span>
+            </>
+          )}
           {journey.status === "unavailable" && <p className="text-sm text-muted-foreground">Street View: {journey.message}</p>}
 
           {!planning && (
