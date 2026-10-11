@@ -87,6 +87,7 @@ const FOCUS = pin("pin-current", "", 18);
 export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination, focus }: Props) {
   return (
     <MapContainer
+      key={focus ? "minimap" : "main"}
       center={[SF_CENTER.lat, SF_CENTER.lng]}
       zoom={14}
       className="h-full w-full"
