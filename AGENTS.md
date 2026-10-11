@@ -11,7 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Base44 sandbox setup
 
 - **Runtime:** Next.js 16.3.6 (Turbopack) on Node 22, via `docker-compose.base44.yml`.
-- **No external credentials needed to boot.** The app is a frontend-only demo at this stage. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ENGINE_URL`, and `SUPABASE_*` are only referenced in modules not imported by any page (`src/lib/supabase.ts` has `import "server-only"` and is unused by routes). Add them via the Base44 secrets dashboard when batches 4–6 land.
+- **Credentials:** `ANTHROPIC_API_KEY`, `GOOGLE_MAPS_API_KEY`, and `OPENAI_API_KEY` are wired via `env_file: /run/base44/app.env` (Base44 secrets dashboard). Placeholder defaults in `.env.base44-defaults` let the app boot before real values are provided. On `main`, none are used at boot — they matter only in API routes on feature branches (`street-parking` uses Anthropic; `s2-street-journey` uses Anthropic + Google Maps).
 - **`predev` script** (`scripts/mediapipe-assets.mjs`) copies MediaPipe WASM from `node_modules` and downloads the EfficientDet-Lite0 model into `public/mediapipe/`. It needs network access on first boot; the download is cached on the named volume thereafter.
 - **`allowedDevOrigins`** in `next.config.ts` is conditionally set only when `BASE44_PREVIEW_MODE === "1"` so the preview proxy can load dev assets/HMR. No effect in normal local dev.
 - **Three routes:** `/` (landing), `/car` (Park my car — Leaflet map), `/me` (Park me — camera demo).

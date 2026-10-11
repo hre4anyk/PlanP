@@ -8,6 +8,9 @@ services:
       - web_next:/app/.next
     ports:
       - "3000:3000"
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
     environment:
       - BASE44_PREVIEW_MODE=1
       - BASE44_PUBLIC_HOST_SUFFIX=${BASE44_PUBLIC_HOST_SUFFIX}

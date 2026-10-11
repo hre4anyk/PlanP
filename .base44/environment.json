@@ -2,5 +2,21 @@
   "previewPort": 3000,
   "healthPath": "/",
   "startCommand": "docker compose -f docker-compose.base44.yml up -d",
-  "secrets": []
+  "secrets": [
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "description": "Anthropic API key (console.anthropic.com → API Keys). Used by Claude photo/curb analysis in the street-parking and s2-street-journey branches.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "GOOGLE_MAPS_API_KEY",
+      "description": "Google Maps API key (Google Cloud Console → APIs & Services → Credentials). Used by the Street View photo proxy in the s2-street-journey branch. Needs Street View Static API enabled.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "description": "OpenAI API key (platform.openai.com → API Keys). Listed in .env.example for the Realtime voice feature (batch 6, not yet built).",
+      "requiredAtBoot": false
+    }
+  ]
 }
