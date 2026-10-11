@@ -9,16 +9,22 @@ export function SiteHeader() {
           <span className="size-1.5 rounded-full bg-primary" aria-hidden />
           <span className="font-heading text-xl font-bold tracking-tight text-primary">P</span>
         </Link>
-        <nav className="flex items-center gap-1 sm:gap-2">
+        <nav className="flex items-center gap-0.5 sm:gap-2">
+          <Link
+            href="/me"
+            className="rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3"
+          >
+            Park me
+          </Link>
           <Link
             href="/car"
-            className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3"
           >
             Park my car
           </Link>
           <Link
             href="/#how"
-            className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="hidden rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:block sm:px-3"
           >
             How it works
           </Link>

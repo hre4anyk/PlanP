@@ -52,7 +52,8 @@ src/                         Next.js app (Netlify)
     trip.ts                  car trip in the browser: start, "Lot is full" → next plan, grow chain, full lots for the map
     trip.test.ts
   vision/
-    detector.ts              MediaPipe object detector wrapper (load once, detect per frame)
+    detector.ts              starts the detector worker; sends one camera frame at a time (stale frames dropped)
+    detector-worker.ts       Web Worker running MediaPipe (GPU first, CPU fallback with a fresh runtime)
     frame.ts                 grab a JPEG from the video, cropped to one chair
   voice/
     realtime.ts              WebRTC session, tool definitions, announce(text)
@@ -129,7 +130,7 @@ Notes:
 - **Claude in `/api/look`:** `@anthropic-ai/sdk` directly, because this check is time-critical and shouldn't wait on a job queue. Images resized to ≤ 768 px and cropped to the chair. The result is posted to the Anbaric job as an event, attributed to `Agent("claude-eyes")`.
 - **Opus 5.5 thinking can't be turned off;** speed and cost are controlled with `effort: "low"`.
 - **OpenAI Realtime:** the browser connects over WebRTC with a short-lived key from `/api/voice-key`. Tool calls arrive on the data channel; the browser runs them (instant reroute, call the engine) and returns the result. Announcements are sent into the same session so one voice speaks everything. Exact endpoint and event names get checked against OpenAI's Realtime docs when it's built (batch 6).
-- **MediaPipe:** `@mediapipe/tasks-vision`; model file served from `public/models/`, so the demo doesn't depend on a CDN.
+- **MediaPipe:** `@mediapipe/tasks-vision` in a Web Worker so the camera view stays smooth on phones; 640×480 camera frames; runtime and model copied into `public/mediapipe/` by `scripts/mediapipe-assets.mjs` before dev/build, so the demo doesn't depend on a CDN.
 
 ## 5. Fallbacks
 
@@ -148,7 +149,7 @@ Notes:
 1. **Start:** `POST /api/engine/sessions { mode: "me" }` → Anbaric job in `scanning`.
 2. **Scan (2 s, browser):** detector boxes for `chair`/`couch` are merged across frames into stable seats. Distance uses a pinhole model: `distance ≈ 0.85 m × focalPx / boxHeightPx`, focal length from an assumed ~65° horizontal field of view; `steps = distance / 0.75`. Direction comes from the box's horizontal position. Seats are posted to the job → `ready`.
 3. **This is me:** `/api/look` describes the driver; stored on the job.
-4. **Occupancy (every frame, browser):** a seat is taken when a `person` box overlaps its lower half by ≥ 40% for ≥ 1 s; free after 2 s without. No network.
+4. **Occupancy (every frame, browser):** a seat is taken when a `person` box covers ≥ 30% of its lower half for ≥ 1 s; free after 2 s without. No network.
 5. **Find a spot:** the voice model calls `find_spot(wish)` → event to the job → `planning` → Claude agent writes `chain` → `guiding`. The browser polls `GET /sessions/:id` (about once a second) and shows A/B/C; the voice announces Plan A.
 6. **Target seat becomes taken:** crop → `/api/look` "is this the driver?"
    - `false` → **instantly** in the browser: ✕, next seat, redraw, voice announcement. Then event `seat_taken` (actor `Code("camera")`) and `reroute` (actor `Agent("claude-eyes")`) to the job. If fewer than 2 seats remain, the job re-plans.
