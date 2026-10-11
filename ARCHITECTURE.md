@@ -39,7 +39,8 @@ src/
     api/research/route.ts    (S3) Claude + web search: investor brief + likely questions
   ai/
     models.ts                (S2) model IDs and list prices, one place
-    founder.ts               (S3) founder context from idea.md for the coach
+    founder.ts               founder context from idea.md for the coach
+  voice/copilot.ts           WebRTC voice session, tool calls, queued app updates
   data/lots.ts               12 fake SF garages + preset places
   data/poc-route.json        the demo route (S2b): path, photo IDs, headings, Claude's verdicts; built by scripts/build-poc-route.mts
   logic/
@@ -85,7 +86,7 @@ type CurbPoint = LatLng & {
 
 **S2b — the demo route:** 995 Market St → 2 S Park St is precomputed once (route, a photo every 40 m along the whole drive, Claude's verdicts; $0.63 one-off) into `poc-route.json`. When the trip matches it, the journey appears instantly and auto-plays (0.7 s per photo while driving, 1.2 s in the parking zone, next 4 photos preloaded). Only photo IDs and verdicts are stored; images always come live through `/api/streetview/photo`. Verdicts show only within a 10-minute walk of the meeting; before that the view says "Driving". The demo starts at Frontier Tower; "Use my location" switches to GPS for live trips.
 
-**S3 — copilot:** short-lived key → WebRTC voice session → it asks where/when (`set_destination` → S1 flow), who you're meeting (`research_investor` → Claude + web search), then coaches with likely questions using `founder.ts`.
+**S3 — copilot (built):** "🎙 Talk to Plan P" → `/api/voice-key` mints a short-lived OpenAI Realtime key (model `gpt-realtime-2.1-mini`, voice `marin`, input transcription, the instructions and four tools fixed server-side) → `src/voice/copilot.ts` opens WebRTC (mic in, voice out, data channel `oai-events`). Flow: greet → "where and when?" → `set_destination` (the demo address "2 South Park" maps to the precomputed route and starts the drive) → summary of drive, free street parking and garage backup → "who are you meeting?" → `research_investor` → `/api/research` (Claude Opus 5.5 + `web_search`, max 3 searches, resumes `pause_turn`; ~20 s, ~$0.11) → brief in the panel → coaching: one likely question, feedback in two sentences, next question. During the drive the page sends "[Plan P app] …" updates (free parking on the right, arrival); they queue while the copilot is speaking (one response at a time). `parking_options` and `i_parked` read the live trip. Replies are kept under 35 words. Founder context: `src/ai/founder.ts` (from idea.md).
 
 ## 6. Fallbacks
 

@@ -13,6 +13,7 @@ import { fetchRoute, type Route } from "@/logic/route";
 import { sampleStretch } from "@/logic/stretch";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { cn } from "@/lib/utils";
+import { VoiceCopilot, type CopilotState } from "@/voice/copilot";
 
 // Leaflet touches `window`, so the map only renders in the browser.
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -29,6 +30,11 @@ type Journey =
   | { status: "ready"; frames: CurbFrame[]; route: Route; trace: { ms: number; photos: number; costUsd: number; precomputed?: boolean } }
   | { status: "unavailable"; message: string };
 type StartState = "finding" | "gps" | "fallback" | "poc";
+type Brief = { who: string; focus: string; angle: string; questions: string[]; watchOut: string };
+type Line = { who: "you" | "copilot"; text: string };
+
+/** The demo meeting, however he says it: "2 South Park", "South Park Street", "2 S Park St"… */
+const isDemoAddress = (address: string) => /south\s*park|\b2\s*s\.?\s*park/i.test(address);
 
 // The demo route (PRD S2b): built once by scripts/build-poc-route.mts, instant and free to replay.
 const POC_START: LatLng = { lat: poc.start.lat, lng: poc.start.lng };
@@ -66,6 +72,37 @@ export function CarApp() {
   const [journey, setJourney] = useState<Journey>({ status: "idle" });
   const [frameIndex, setFrameIndex] = useState(0);
   const [parked, setParked] = useState(false);
+
+  // S3: the voice copilot and the agents it calls.
+  const [copilotState, setCopilotState] = useState<CopilotState>("off");
+  const [copilotDetail, setCopilotDetail] = useState("");
+  const [lines, setLines] = useState<Line[]>([]);
+  const [brief, setBrief] = useState<Brief | null>(null);
+  const copilotRef = useRef<VoiceCopilot | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const lastAlertRef = useRef(0);
+  // Tool handlers outlive renders, so they read the latest trip state through refs.
+  const live = useRef({ journey, trip, destination });
+  useEffect(() => {
+    live.current = { journey, trip, destination };
+  }, [journey, trip, destination]);
+  useEffect(() => () => copilotRef.current?.stop(), []);
+  const frameIndexRef = useRef(0);
+
+  // Live parking alerts during the drive: the copilot says it when a free stretch comes up.
+  useEffect(() => {
+    frameIndexRef.current = frameIndex;
+    const copilot = copilotRef.current;
+    if (!copilot?.live || journey.status !== "ready") return;
+    const f = journey.frames[frameIndex];
+    const now = Date.now();
+    if (frameIndex === journey.frames.length - 1) {
+      copilot.say("[Plan P app] He has reached the meeting block. Remind him of the best parking he passed and wish him luck.");
+    } else if (f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN && now - lastAlertRef.current > 12000) {
+      lastAlertRef.current = now;
+      copilot.say(`[Plan P app] Free street parking on his right right now: ${f.kind}, ${f.walkMin} minutes' walk to the meeting.`);
+    }
+  }, [frameIndex, journey]);
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Show the status card from the top whenever the plan changes.
@@ -155,6 +192,96 @@ export function CarApp() {
     void planJourney(destination);
   }
 
+  /** Plan a trip in one go (used by the copilot): destination, garages, street journey. */
+  function planFor(dest: Place, time?: string) {
+    setDestination(dest);
+    setQuery(dest.name);
+    if (time) setMeetingTime(time);
+    setResults(null);
+    setParked(false);
+    setFrameIndex(0);
+    setTrip(startTrip(dest, LOTS));
+    void planJourney(dest);
+  }
+
+  function freeSpots(frames: CurbFrame[]) {
+    return frames.filter((f) => f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN).sort((a, b) => a.walkMin - b.walkMin);
+  }
+
+  const tools = {
+    set_destination: async (args: Record<string, unknown>) => {
+      const address = String(args.address ?? "");
+      const time = typeof args.meeting_time === "string" && /^\d{1,2}:\d{2}$/.test(args.meeting_time) ? args.meeting_time : undefined;
+      let dest: Place;
+      if (isDemoAddress(address)) {
+        dest = POC_MEETING;
+        setStart(POC_START);
+        setStartState("poc");
+      } else {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
+        const data = await res.json();
+        if (!res.ok || !data.results?.length) return `I couldn't find "${address}" in San Francisco. Ask him to repeat the street and number.`;
+        dest = data.results[0];
+      }
+      planFor(dest, time);
+      const garage = startTrip(dest, LOTS).chain[0];
+      const garageName = garage ? lotById.get(garage.id)!.name : null;
+      if (dest === POC_MEETING) {
+        const spots = freeSpots(poc.frames as CurbFrame[]);
+        const now = new Date();
+        const a = arrival(now, poc.driveMin, spots[0]?.walkMin ?? 0, time ? meetingAt(time, now) : null);
+        return [
+          `Route set from Frontier Tower to 2 South Park Street: about ${poc.driveMin} minutes' drive.`,
+          spots.length ? `${spots.length} stretches with free street parking near the meeting, the closest ${spots[0].walkMin} minutes' walk (${spots[0].kind}).` : "No free street parking seen near the meeting.",
+          garageName ? `Garage backup: ${garageName}.` : "",
+          `At the door around ${clock(a.atDoor)}${a.spareMin !== null ? `, ${spareText(a.spareMin)}` : ""}.`,
+        ].join(" ");
+      }
+      return `Route set to ${dest.name}. I'm reading Street View along the last stretch for parking now; it takes about 10 seconds.${garageName ? ` Garage backup: ${garageName}.` : ""}`;
+    },
+    research_investor: async (args: Record<string, unknown>) => {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: String(args.name ?? ""), firm: args.firm ? String(args.firm) : undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) return `Research didn't work (${data.error}). Coach him with tough general defense-VC questions instead.`;
+      setBrief(data.brief);
+      return JSON.stringify(data.brief);
+    },
+    parking_options: async () => {
+      const { journey: j, trip: t } = live.current;
+      const garage = t?.chain[t.currentIndex];
+      const garageText = garage ? ` Garage backup: ${lotById.get(garage.id)!.name}, ${garage.distance}.` : "";
+      if (j.status !== "ready") return `The parking check isn't ready yet.${garageText}`;
+      const spots = freeSpots(j.frames).slice(0, 3);
+      if (!spots.length) return `No free street parking within a ${PARKING_ZONE_WALK_MIN}-minute walk.${garageText}`;
+      return `Free street parking: ${spots.map((f) => `${f.kind}, ${f.walkMin} min walk`).join("; ")}.${garageText}`;
+    },
+    i_parked: async () => {
+      setParked(true);
+      const { journey: j } = live.current;
+      const walk = j.status === "ready" ? j.frames[Math.min(frameIndexRef.current, j.frames.length - 1)].walkMin : null;
+      return walk !== null ? `Parked. About ${walk} minutes' walk to the meeting.` : "Parked.";
+    },
+  };
+
+  async function startCopilot() {
+    copilotRef.current?.stop();
+    setLines([]);
+    const copilot = new VoiceCopilot({
+      onState: (state, detail) => {
+        setCopilotState(state);
+        setCopilotDetail(detail ?? "");
+      },
+      onTranscript: (who, text) => setLines((prev) => [...prev.slice(-3), { who, text }]),
+      tools,
+    });
+    copilotRef.current = copilot;
+    await copilot.start(audioRef.current!);
+  }
+
   function chooseDestination(place: Place) {
     setDestination(place);
     setResults(null);
@@ -242,10 +369,64 @@ export function CarApp() {
       <aside
         className={cn(
           "flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l",
-          journey.status === "ready" ? "max-h-[30dvh]" : "max-h-[55dvh]",
+          journey.status === "ready" ? "max-h-[38dvh]" : "max-h-[60dvh]",
         )}
       >
         <div ref={panelRef} className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", journey.status === "ready" ? "gap-3 p-4" : "gap-5 p-5 sm:p-6")}>
+          {/* S3: the voice copilot */}
+          <audio ref={audioRef} autoPlay playsInline className="hidden" />
+          <div className="order-0 flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            {copilotState === "off" || copilotState === "error" ? (
+              <div className="flex items-center gap-3">
+                <Button size="lg" className="h-12 shrink-0" onClick={() => void startCopilot()}>
+                  🎙 Talk to Plan P
+                </Button>
+                <p className="text-xs leading-snug text-muted-foreground">
+                  {copilotState === "error" ? <span className="text-destructive">{copilotDetail}</span> : "Your copilot: the route, the parking and pitch prep for your investor."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <span className={cn("size-2.5 rounded-full", copilotState === "live" ? "animate-pulse bg-success" : "bg-amber-400")} />
+                    {copilotState === "connecting"
+                      ? "Connecting…"
+                      : copilotState === "working"
+                        ? copilotDetail.includes("research")
+                          ? "Claude is researching your investor…"
+                          : "Working on it…"
+                        : "Listening"}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => copilotRef.current?.stop()}>
+                    End
+                  </Button>
+                </div>
+                {lines.slice(-2).map((l, i) => (
+                  <p key={i} className={cn("text-sm leading-snug", l.who === "you" ? "text-muted-foreground" : "text-foreground")}>
+                    <span className="font-semibold">{l.who === "you" ? "You: " : "Plan P: "}</span>
+                    {l.text}
+                  </p>
+                ))}
+              </>
+            )}
+            {brief && (
+              <details className="text-sm">
+                <summary className="cursor-pointer font-medium">Investor brief (Claude, live web search)</summary>
+                <div className="flex flex-col gap-1.5 pt-2 text-muted-foreground">
+                  <p>{brief.who}</p>
+                  <p><span className="text-foreground">Angle:</span> {brief.angle}</p>
+                  <ol className="list-decimal pl-5">
+                    {brief.questions.map((q, i) => (
+                      <li key={i}>{q}</li>
+                    ))}
+                  </ol>
+                  <p><span className="text-foreground">Watch out:</span> {brief.watchOut}</p>
+                </div>
+              </details>
+            )}
+          </div>
+
           {trip && destination && (
             <div
               role="status"
