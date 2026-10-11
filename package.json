@@ -3,17 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/mediapipe-assets.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/mediapipe-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@base-ui/react": "^1.8.0",
-    "@mediapipe/tasks-vision": "^1.1.0",
     "@stellar/stellar-sdk": "^17.1.0",
     "@supabase/supabase-js": "^2.117.2",
     "class-variance-authority": "^0.7.1",

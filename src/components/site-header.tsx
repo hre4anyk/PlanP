@@ -11,12 +11,6 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-0.5 sm:gap-2">
           <Link
-            href="/me"
-            className="rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3"
-          >
-            Park me
-          </Link>
-          <Link
             href="/car"
             className="rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground sm:px-3"
           >

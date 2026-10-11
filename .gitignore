@@ -45,5 +45,3 @@ next-env.d.ts
 .netlify
 deno.lock
 
-# MediaPipe runtime + model, copied/downloaded by scripts/mediapipe-assets.mjs
-/public/mediapipe/

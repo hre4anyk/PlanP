@@ -12,10 +12,12 @@ type Props = {
   lots: Lot[];
   chain: ChainItem[];
   currentIndex: number;
-  destination: LatLng;
+  destination: LatLng | null;
   start: LatLng;
   route: Route | null;
   onPickDestination: (point: LatLng) => void;
+  /** The Street View photo being shown: marked and kept in view (minimap). */
+  focus?: LatLng | null;
 };
 
 const DRIVEN = { color: "#3a3a44", weight: 7, opacity: 1 };
@@ -36,13 +38,15 @@ function lotIcon(lot: Lot, item: ChainItem | undefined, isCurrent: boolean) {
   return pin(isCurrent ? "pin-plan pin-current" : "pin-plan", item.label, 32);
 }
 
-/** Keep the whole snake in view whenever a new route arrives. */
-function FitRoute({ route }: { route: Route | null }) {
+/** Keep the whole snake in view whenever a new route arrives; before that, frame you and the meeting. */
+function FitRoute({ route, start, destination }: { route: Route | null; start: LatLng; destination: LatLng | null }) {
   const map = useMap();
   useEffect(() => {
-    const points = route?.legs.flatMap((leg) => leg.path) ?? [];
-    if (points.length > 1) map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng])), { padding: [40, 40], maxZoom: 16 });
-  }, [map, route]);
+    const routePoints = route?.legs.flatMap((leg) => leg.path) ?? [];
+    const points = routePoints.length > 1 ? routePoints : destination ? [start, destination] : [start];
+    if (points.length > 1) map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng])), { padding: [40, 40], maxZoom: 16, animate: false });
+    else map.setView([start.lat, start.lng], 15, { animate: false });
+  }, [map, route, start, destination]);
   return null;
 }
 
@@ -69,13 +73,25 @@ function TapToChoose({ onPick }: { onPick: (point: LatLng) => void }) {
   return null;
 }
 
-export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination }: Props) {
+/** Follow the Street View photo being shown. */
+function FollowFocus({ focus }: { focus: LatLng | null | undefined }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focus) map.setView([focus.lat, focus.lng], 17, { animate: false });
+  }, [map, focus]);
+  return null;
+}
+
+const FOCUS = pin("pin-current", "", 18);
+
+export default function MapView({ lots, chain, currentIndex, destination, start, route, onPickDestination, focus }: Props) {
   return (
     <MapContainer
       center={[SF_CENTER.lat, SF_CENTER.lng]}
       zoom={14}
       className="h-full w-full"
       zoomControl={false}
+      zoomAnimation={false}
       attributionControl
     >
       <TileLayer
@@ -84,7 +100,8 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
         maxZoom={19}
       />
       <TapToChoose onPick={onPickDestination} />
-      <FitRoute route={route} />
+      {focus ? <FollowFocus focus={focus} /> : <FitRoute route={route} start={start} destination={destination} />}
+      {focus && <Marker position={[focus.lat, focus.lng]} icon={FOCUS} zIndexOffset={2000} />}
       {route && <Snake route={route} currentIndex={currentIndex} />}
 
       {lots.map((lot) => {
@@ -104,11 +121,13 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
         );
       })}
 
+      {destination && (
       <Marker position={[destination.lat, destination.lng]} icon={FLAG} zIndexOffset={1000}>
         <Popup>Your meeting</Popup>
       </Marker>
+      )}
       <Marker position={[start.lat, start.lng]} icon={CAR} zIndexOffset={1000}>
-        <Popup>You start here</Popup>
+        <Popup>You are here</Popup>
       </Marker>
     </MapContainer>
   );
