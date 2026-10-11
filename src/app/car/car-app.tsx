@@ -13,6 +13,7 @@ import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { RoutePlanBar } from "@/components/route-plan-bar";
+import { appleMapsUrl, googleMapsUrl } from "@/logic/maps";
 import { cn } from "@/lib/utils";
 
 // Leaflet touches `window`, so the map only renders in the browser.
@@ -305,16 +306,45 @@ export function CarApp() {
               {journey.status === "ready" && <span className="eyebrow">Garage backup — {trip.chain.length} plans</span>}
               <p className={cn("leading-snug font-medium", journey.status === "ready" ? "text-sm" : "text-lg")}>{headingMessage(trip, route, rerouted, destination)}</p>
               {arrivalLine && <p className={cn(journey.status === "ready" ? "text-sm" : "text-base", late ? "font-semibold text-destructive" : "text-muted-foreground")}>{arrivalLine}</p>}
-              {journey.status === "ready" && !trip.exhausted && !parked && (
-                <div className="flex gap-2 pt-1">
-                  <button type="button" onClick={() => setParked(true)} className="rounded-md bg-success px-3 py-1 text-sm font-bold text-black">
-                    Garage {trip.chain[trip.currentIndex]?.label} is Free
-                  </button>
-                  <button type="button" onClick={occupied} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
-                    Occupied →
-                  </button>
-                </div>
-              )}
+              {journey.status === "ready" && !trip.exhausted && !parked && (() => {
+                const target = trip.chain[trip.currentIndex] ? lotById.get(trip.chain[trip.currentIndex].id)! : destination;
+                return (
+                  <>
+                    <div className="flex gap-2 pt-1">
+                      <button type="button" onClick={() => setParked(true)} className="rounded-md bg-success px-3 py-1 text-sm font-bold text-black">
+                        Garage {trip.chain[trip.currentIndex]?.label} is Free
+                      </button>
+                      <button type="button" onClick={occupied} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
+                        Occupied →
+                      </button>
+                    </div>
+                    {target && (
+                      <div className="flex gap-3 pt-1.5">
+                        <a href={appleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                          Apple Maps →
+                        </a>
+                        <a href={googleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                          Google Maps →
+                        </a>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+              {journey.status !== "ready" && !parked && (() => {
+                const target = trip.chain[trip.currentIndex] ? lotById.get(trip.chain[trip.currentIndex].id)! : destination;
+                if (!target) return null;
+                return (
+                  <div className="flex gap-3 pt-1">
+                    <a href={appleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                      Apple Maps →
+                    </a>
+                    <a href={googleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                      Google Maps →
+                    </a>
+                  </div>
+                );
+              })()}
               {journey.status === "ready" && parked && (
                 <p className="pt-1 text-sm font-semibold text-success">Parked! You&apos;re all set.</p>
               )}
@@ -509,6 +539,16 @@ export function CarApp() {
             <div className="flex h-16 items-center justify-center rounded-xl bg-success/15 text-lg font-bold text-success">
               ✓ Parked — you&apos;ve arrived!
             </div>
+            {destination && (
+              <div className="mt-3 flex gap-3">
+                <a href={appleMapsUrl(destination, "walking")} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg border border-input py-2.5 text-center text-sm font-medium text-foreground hover:bg-white/5">
+                  Walk to meeting in Maps
+                </a>
+                <a href={googleMapsUrl(destination, "walking")} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg border border-input py-2.5 text-center text-sm font-medium text-foreground hover:bg-white/5">
+                  Google Maps walk
+                </a>
+              </div>
+            )}
           </div>
         )}
       </aside>
