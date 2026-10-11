@@ -12,10 +12,10 @@ services:
       - ./.env.base44-defaults
       - /run/base44/app.env
     environment:
-      - BASE44_PREVIEW_MODE=1
+      - BASE44_PREVIEW_MODE
       - BASE44_PUBLIC_HOST_SUFFIX=${BASE44_PUBLIC_HOST_SUFFIX}
       - BASE44_SANDBOX_HOST_DOMAIN=${BASE44_SANDBOX_HOST_DOMAIN}
-    command: ["sh", "-ec", "npm install && exec npm run dev -- -H 0.0.0.0"]
+    command: ["sh", "-ec", "npm ci --no-audit --no-fund && exec npm run dev -- -H 0.0.0.0"]
     healthcheck:
       test:
         - CMD

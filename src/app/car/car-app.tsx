@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { DEMO_START, LOTS, MEETING_PLACES, formatClearance, type LatLng } from "@/data/lots";
 import { nearestOpenLot } from "@/logic/chain";
 import { arrival, clock, meetingAt, spareText } from "@/logic/eta";
-import { walkMinutes } from "@/logic/geo";
+import { distanceMetres, walkDistanceText, walkMinutes } from "@/logic/geo";
+import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
-import { sampleStretch } from "@/logic/stretch";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +25,8 @@ const lotById = new Map(LOTS.map((lot) => [lot.id, lot]));
 type Place = LatLng & { name: string };
 type Journey =
   | { status: "idle" }
-  | { status: "loading"; points: number }
-  | { status: "ready"; frames: CurbFrame[]; route: Route; trace: { ms: number; photos: number; costUsd: number; precomputed?: boolean } }
+  | { status: "loading" }
+  | { status: "ready"; frames: CurbFrame[]; route: Route; trace: JourneyTrace }
   | { status: "unavailable"; message: string };
 type StartState = "finding" | "gps" | "fallback" | "poc";
 
@@ -66,6 +66,9 @@ export function CarApp() {
   const [journey, setJourney] = useState<Journey>({ status: "idle" });
   const [frameIndex, setFrameIndex] = useState(0);
   const [parked, setParked] = useState(false);
+
+  const journeyRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => journeyRequest.current?.abort(), []);
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Show the status card from the top whenever the plan changes.
@@ -111,6 +114,7 @@ export function CarApp() {
   }, [stopsKey, start, destination]);
 
   function reset() {
+    journeyRequest.current?.abort();
     setTrip(null);
     setRoute(null);
     setJourney({ status: "idle" });
@@ -118,10 +122,13 @@ export function CarApp() {
     setParked(false);
   }
 
-  /** S2: the drive straight to the meeting → Street View photos of its last stretch → Claude's verdicts. */
-  async function planJourney(dest: Place) {
-    if (isPocTrip(start, dest)) {
-      setFrameIndex(0);
+  /** Each active parking plan gets its own drive photos and the same curb analysis. */
+  async function planJourney(dest: Place, from: LatLng, target: LatLng, useDemo = false) {
+    journeyRequest.current?.abort();
+    const request = new AbortController();
+    journeyRequest.current = request;
+    setFrameIndex(0);
+    if (useDemo && isPocTrip(from, dest)) {
       setJourney({
         status: "ready",
         frames: poc.frames as CurbFrame[],
@@ -130,29 +137,38 @@ export function CarApp() {
       });
       return;
     }
-    const direct = await fetchRoute([start, dest]);
-    const points = sampleStretch(direct.legs.flatMap((l) => l.path), dest);
-    if (!points.length) {
-      setJourney({ status: "unavailable", message: "You're already within a short walk of the meeting." });
-      return;
-    }
-    setJourney({ status: "loading", points: points.length });
+    setJourney({ status: "loading" });
     try {
-      const res = await fetch("/api/curb", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ points }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      if (!data.frames.length) throw new Error("No Street View photos along this stretch.");
-      setFrameIndex(0);
-      setJourney({ status: "ready", frames: data.frames, route: direct, trace: data.trace });
+      const next = await loadJourney(from, target, dest, request.signal);
+      if (!request.signal.aborted) setJourney({ status: "ready", ...next });
     } catch (err) {
-      setJourney({ status: "unavailable", message: err instanceof Error ? err.message : "Street View is unavailable." });
+      if (!request.signal.aborted) {
+        setJourney({ status: "unavailable", message: err instanceof Error ? err.message : "Street View is unavailable." });
+      }
     }
   }
 
   function plan() {
     if (!destination) return;
-    setTrip(startTrip(destination, LOTS));
-    void planJourney(destination);
+    const next = startTrip(destination, LOTS);
+    setTrip(next);
+    const target = lotById.get(next.chain[0]?.id) ?? destination;
+    void planJourney(destination, start, target, true);
+  }
+
+  function occupied() {
+    if (!trip || !destination || trip.exhausted) return;
+    const from = lotById.get(trip.chain[trip.currentIndex].id)!;
+    const next = markCurrentFull(trip, destination, LOTS);
+    setTrip(next);
+    setParked(false);
+    if (next.exhausted) {
+      journeyRequest.current?.abort();
+      setJourney({ status: "idle" });
+      return;
+    }
+    const target = lotById.get(next.chain[next.currentIndex].id)!;
+    void planJourney(destination, from, target);
   }
 
   function chooseDestination(place: Place) {
@@ -202,6 +218,7 @@ export function CarApp() {
             frames={journey.frames}
             index={frameIndex}
             onIndex={setFrameIndex}
+            destination={destination}
             autoStart
             minimap={
               <MapView
@@ -229,7 +246,7 @@ export function CarApp() {
         )}
         {journey.status === "loading" && (
           <span className="absolute inset-x-4 top-4 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
-            Claude is reading {journey.points} Street View photos along your last 10 minutes…
+            Loading Street View and parking analysis{trip?.chain[trip.currentIndex] ? ` for Plan ${trip.chain[trip.currentIndex].label}` : " along your drive"}…
           </span>
         )}
         {journey.status !== "ready" && route?.approximate && (
@@ -264,13 +281,13 @@ export function CarApp() {
                   <button type="button" onClick={() => setParked(true)} className="rounded-md bg-success px-3 py-1 text-sm font-bold text-black">
                     Garage {trip.chain[trip.currentIndex]?.label} is Free
                   </button>
-                  <button type="button" onClick={() => { setTrip(markCurrentFull(trip, destination, LOTS)); setJourney({ status: "idle" }); }} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
+                  <button type="button" onClick={occupied} className="rounded-md bg-destructive px-3 py-1 text-sm font-bold text-white">
                     Occupied →
                   </button>
                 </div>
               )}
               {journey.status === "ready" && parked && (
-                <p className="pt-1 text-sm font-semibold text-success">Parked! You're all set.</p>
+                <p className="pt-1 text-sm font-semibold text-success">Parked! You&apos;re all set.</p>
               )}
             </div>
           )}
@@ -279,18 +296,20 @@ export function CarApp() {
             const freeSpots = journey.frames
               .map((f, i) => ({ f, i }))
               .filter(({ f }) => f.status === "free_to_park" && f.walkMin <= PARKING_ZONE_WALK_MIN);
-            const closest = freeSpots.reduce<number | null>((m, { f }) => (m === null || f.walkMin < m ? f.walkMin : m), null);
+            const closest = destination ? freeSpots.reduce<CurbFrame | null>((best, { f }) => (
+              !best || distanceMetres(f, destination) < distanceMetres(best, destination) ? f : best
+            ), null) : null;
             return (
               <div className="order-1 flex flex-col gap-1">
                 <span className="eyebrow">Street parking on your way</span>
                 {freeSpots.length > 0 ? (
                   <p className="text-sm">
                     {freeSpots.length} spot{freeSpots.length > 1 ? "s" : ""} free to park
-                    {closest !== null ? ` — closest is ${closest} min walk to your destination` : ""}.
+                    {closest && destination ? ` — closest is ${walkDistanceText(closest, destination)}` : ""}.
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    No free street parking within a {PARKING_ZONE_WALK_MIN}-minute walk. Head for Garage {trip?.chain[0]?.label ?? "A"}.
+                    No free street parking within a {PARKING_ZONE_WALK_MIN}-minute walk. {trip?.exhausted ? "All garage backups are full." : `Head for Garage ${trip?.chain[trip.currentIndex]?.label ?? "A"}.`}
                   </p>
                 )}
                 <span className="font-mono text-xs text-subtle">
@@ -463,7 +482,7 @@ export function CarApp() {
               </button>
               <button
                 type="button"
-                onClick={() => destination && setTrip(markCurrentFull(trip, destination, LOTS))}
+                onClick={occupied}
                 className="h-16 flex-1 rounded-xl bg-destructive text-xl font-bold text-white transition-transform active:scale-[0.98]"
               >
                 Occupied
@@ -474,7 +493,7 @@ export function CarApp() {
         {trip && parked && (
           <div className="border-t border-border p-4 sm:p-5">
             <div className="flex h-16 items-center justify-center rounded-xl bg-success/15 text-lg font-bold text-success">
-              ✓ Parked — you've arrived!
+              ✓ Parked — you&apos;ve arrived!
             </div>
           </div>
         )}

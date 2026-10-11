@@ -7,6 +7,7 @@ import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents 
 import { formatClearance, SF_CENTER, type LatLng, type Lot } from "@/data/lots";
 import type { ChainItem } from "@/logic/chain";
 import type { Route } from "@/logic/route";
+import { walkDistanceText } from "@/logic/geo";
 
 type Props = {
   lots: Lot[];
@@ -119,6 +120,9 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
                 <span>${lot.pricePerHour}/hr · {lot.hours} · clearance {formatClearance(lot.clearanceInches)}</span>
                 {lot.rule && <span>{lot.rule}</span>}
                 <span className={lot.status === "full" ? "lot-full" : "lot-open"}>{lot.status === "full" ? "Full" : "Open"}</span>
+                {lot.status === "open" && destination && (
+                  <span>{walkDistanceText(lot, destination)} (straight-line estimate)</span>
+                )}
               </div>
             </Popup>
           </Marker>
