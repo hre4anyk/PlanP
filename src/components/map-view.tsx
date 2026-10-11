@@ -50,7 +50,7 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
       <TapToChoose onPick={onPickDestination} />
 
       {lots.map((lot) => {
-        const index = chain.findIndex((c) => c.lotId === lot.id);
+        const index = chain.findIndex((c) => c.id === lot.id);
         const item = index >= 0 ? chain[index] : undefined;
         return (
           <Marker key={lot.id} position={[lot.lat, lot.lng]} icon={lotIcon(lot, item, index === currentIndex)} zIndexOffset={item ? 500 : 0}>

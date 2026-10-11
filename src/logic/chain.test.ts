@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LOTS, MEETING_PLACES, type Lot } from "../data/lots";
-import { buildChain, extendChain, MAX_WALK_MIN, planLabel, rankLots } from "./chain";
+import { buildChain, extendChain, MAX_WALK_MIN, nearestOpenLot, planLabel, rankLots } from "./chain";
 import { distanceMetres, walkMinutes } from "./geo";
 
 const frontier = MEETING_PLACES.find((p) => p.id === "frontier")!;
@@ -45,7 +45,8 @@ describe("buildChain", () => {
   it("labels the three best lots Plan A, B, C", () => {
     const chain = buildChain(frontier, LOTS);
     expect(chain.map((c) => c.label)).toEqual(["A", "B", "C"]);
-    expect(chain.map((c) => c.lotId)).toEqual(rankLots(frontier, LOTS).slice(0, 3).map((r) => r.lot.id));
+    expect(chain.map((c) => c.id)).toEqual(rankLots(frontier, LOTS).slice(0, 3).map((r) => r.lot.id));
+    expect(chain[0].distance).toBe(`${rankLots(frontier, LOTS)[0].walkMin} min walk`);
   });
 
   it("returns fewer lots when fewer are in range", () => {
@@ -59,7 +60,7 @@ describe("extendChain", () => {
     const fourth = rankLots(salesforce, LOTS)[3].lot.id;
     const grown = extendChain(chain, salesforce, LOTS, [fourth]);
     expect(grown.slice(3).map((c) => c.label)).toEqual(["D", "E", "F"]);
-    const ids = grown.map((c) => c.lotId);
+    const ids = grown.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).not.toContain(fourth);
   });
@@ -67,6 +68,14 @@ describe("extendChain", () => {
   it("keeps the chain unchanged when nothing is left", () => {
     const everything = extendChain([], frontier, LOTS, [], 100);
     expect(extendChain(everything, frontier, LOTS)).toEqual(everything);
+  });
+});
+
+describe("nearestOpenLot", () => {
+  it("names the closest open lot even beyond walking range", () => {
+    const far = { lat: 37.73, lng: -122.45 }; // Glen Park, ~4 km from the nearest garage
+    expect(buildChain(far, LOTS)).toEqual([]);
+    expect(nearestOpenLot(far, LOTS)!.lot.id).toBe("L12");
   });
 });
 

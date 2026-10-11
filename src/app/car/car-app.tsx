@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DEMO_START, LOTS, MEETING_PLACES, formatClearance, type LatLng } from "@/data/lots";
-import { buildChain, type ChainItem } from "@/logic/chain";
+import { buildChain, nearestOpenLot, type ChainItem } from "@/logic/chain";
 import { cn } from "@/lib/utils";
 
 // Leaflet touches `window`, so the map only renders in the browser.
@@ -23,6 +23,7 @@ export function CarApp() {
   const [locating, setLocating] = useState(false);
   const [chain, setChain] = useState<ChainItem[] | null>(null);
   const [currentIndex] = useState(0);
+  const nearest = chain?.length === 0 ? nearestOpenLot(destination, LOTS) : undefined;
 
   function chooseDestination(id: string, point: LatLng) {
     setDestinationId(id);
@@ -84,6 +85,7 @@ export function CarApp() {
 
           <div className="flex flex-col gap-2">
             <span className="eyebrow">Starting from</span>
+            <span className="text-xs text-subtle">Used for your driving route. Garages are picked by walk to your meeting.</span>
             <div className="flex items-center justify-between gap-3">
               <span className="text-base">{startLabel}</span>
               <Button variant="ghost" size="sm" onClick={useMyLocation} disabled={locating}>
@@ -97,17 +99,20 @@ export function CarApp() {
           </Button>
 
           {chain && chain.length === 0 && (
-            <p className="text-muted-foreground">No open garages within a 15-minute walk. Try another meeting place.</p>
+            <p className="text-muted-foreground">
+              No open garages within a 15-minute walk.
+              {nearest && ` The closest is ${nearest.lot.name}, about ${nearest.walkMin} min away.`}
+            </p>
           )}
 
           {chain && chain.length > 0 && (
             <ol className="flex flex-col gap-3">
               {chain.map((item, i) => {
-                const lot = lotById.get(item.lotId)!;
+                const lot = lotById.get(item.id)!;
                 const current = i === currentIndex;
                 return (
                   <li
-                    key={item.lotId}
+                    key={item.id}
                     className={cn(
                       "flex items-start gap-4 rounded-lg border p-4",
                       current ? "border-primary/60 bg-primary/5" : "border-border",
@@ -124,7 +129,7 @@ export function CarApp() {
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className="font-medium">{lot.name}</span>
                       <span className="text-sm text-muted-foreground">
-                        {item.walkMin} min walk · ${lot.pricePerHour}/hr · {lot.hours}
+                        {item.distance} · ${lot.pricePerHour}/hr · {lot.hours}
                       </span>
                       <span className="text-xs text-subtle">
                         Clearance {formatClearance(lot.clearanceInches)}{lot.rule ? ` · ${lot.rule}` : ""}
@@ -134,6 +139,9 @@ export function CarApp() {
                 );
               })}
             </ol>
+          )}
+          {chain && chain.length > 0 && (
+            <p className="text-xs text-subtle">Walk times are straight-line estimates.</p>
           )}
         </div>
       </aside>

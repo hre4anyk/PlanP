@@ -6,7 +6,8 @@ export const MAX_WALK_MIN = 15;
 export const CHAIN_SIZE = 3;
 
 export type RankedLot = { lot: Lot; walkMin: number; metres: number };
-export type ChainItem = { lotId: string; label: string; walkMin: number; reason: string };
+/** Shared with Park me and the Anbaric engine (ARCHITECTURE §3). `distance` is display text: "5 min walk". */
+export type ChainItem = { id: string; label: string; distance: string; reason: string };
 
 /** Plan A, B, … Z, then AA, AB … so the chain can keep growing. */
 export function planLabel(index: number): string {
@@ -33,7 +34,12 @@ export function rankLots(destination: LatLng, lots: Lot[], excludeIds: Iterable<
 }
 
 function toItem(r: RankedLot, index: number): ChainItem {
-  return { lotId: r.lot.id, label: planLabel(index), walkMin: r.walkMin, reason: `${r.walkMin} min walk` };
+  return {
+    id: r.lot.id,
+    label: planLabel(index),
+    distance: `${r.walkMin} min walk`,
+    reason: index === 0 ? "Shortest walk to your meeting" : "Backup: next shortest walk",
+  };
 }
 
 /** Plan A, B, C: the top of the ranking. */
@@ -52,9 +58,17 @@ export function extendChain(
   fullIds: Iterable<string> = [],
   size = CHAIN_SIZE,
 ): ChainItem[] {
-  const used = [...chain.map((c) => c.lotId), ...fullIds];
+  const used = [...chain.map((c) => c.id), ...fullIds];
   const next = rankLots(destination, lots, used)
     .slice(0, size)
     .map((r, i) => toItem(r, chain.length + i));
   return [...chain, ...next];
+}
+
+/** The closest open lot regardless of walking range, so an empty chain can still say what's nearest. */
+export function nearestOpenLot(destination: LatLng, lots: Lot[]): RankedLot | undefined {
+  return lots
+    .filter((lot) => lot.status === "open")
+    .map((lot) => ({ lot, walkMin: walkMinutes(lot, destination), metres: distanceMetres(lot, destination) }))
+    .sort((a, b) => a.metres - b.metres)[0];
 }
