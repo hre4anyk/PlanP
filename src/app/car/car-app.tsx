@@ -446,28 +446,29 @@ export function CarApp() {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    <span className={cn("size-2.5 rounded-full", copilotState === "live" ? "animate-pulse bg-success" : "bg-amber-400")} />
-                    {copilotState === "connecting" ? "Connecting…" : muted ? "Mic off · tap to answer" : scoring ? "Claude is scoring your pitch…" : copilotState === "working" ? "Working on it…" : "Listening"}
-                  </span>
-                  <div className="flex shrink-0 gap-1">
-                    <Button
-                      variant={muted ? "default" : "outline"}
-                      size="sm"
-                      aria-pressed={muted}
-                      onClick={() => {
-                        copilotRef.current?.setMuted(!muted);
-                        setMuted(!muted);
-                      }}
-                    >
-                      {muted ? "🔇 Mic off" : "🎙 Mic on"}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => copilotRef.current?.stop()}>
-                      End
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={muted}
+                    onClick={() => {
+                      copilotRef.current?.setMuted(!muted);
+                      setMuted(!muted);
+                    }}
+                    className={cn(
+                      "flex h-14 flex-1 items-center justify-center gap-2 rounded-xl text-lg font-bold",
+                      muted ? "bg-destructive text-white" : "border-2 border-success bg-success/10 text-success",
+                    )}
+                  >
+                    {muted ? "🔇 Mic off · tap to talk" : "🎙 Mic on · tap to mute"}
+                  </button>
+                  <Button variant="ghost" size="sm" className="h-14" onClick={() => copilotRef.current?.stop()}>
+                    End
+                  </Button>
                 </div>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className={cn("size-2 rounded-full", muted ? "bg-destructive" : copilotState === "live" ? "animate-pulse bg-success" : "bg-amber-400")} />
+                  {copilotState === "connecting" ? "Connecting…" : muted ? "She can't hear you" : scoring ? "Claude is scoring your pitch…" : copilotState === "working" ? "Working on it…" : "Listening"}
+                </span>
                 {lines.slice(-2).map((l, i) => (
                   <p key={i} className={cn("text-sm leading-snug", l.who === "you" ? "text-muted-foreground" : "text-foreground")}>
                     <span className="font-semibold">{l.who === "you" ? "You: " : "Plan P: "}</span>
