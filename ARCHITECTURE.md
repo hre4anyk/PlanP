@@ -148,7 +148,7 @@ Notes:
 1. **Start:** `POST /api/engine/sessions { mode: "me" }` → Anbaric job in `scanning`.
 2. **Scan (2 s, browser):** detector boxes for `chair`/`couch` are merged across frames into stable seats. Distance uses a pinhole model: `distance ≈ 0.85 m × focalPx / boxHeightPx`, focal length from an assumed ~65° horizontal field of view; `steps = distance / 0.75`. Direction comes from the box's horizontal position. Seats are posted to the job → `ready`.
 3. **This is me:** `/api/look` describes the driver; stored on the job.
-4. **Occupancy (every frame, browser):** a seat is taken when a `person` box overlaps its lower half by ≥ 40% for ≥ 1 s; free after 2 s without. No network.
+4. **Occupancy (every frame, browser):** a seat is taken when a `person` box covers ≥ 30% of its lower half for ≥ 1 s; free after 2 s without. No network.
 5. **Find a spot:** the voice model calls `find_spot(wish)` → event to the job → `planning` → Claude agent writes `chain` → `guiding`. The browser polls `GET /sessions/:id` (about once a second) and shows A/B/C; the voice announces Plan A.
 6. **Target seat becomes taken:** crop → `/api/look` "is this the driver?"
    - `false` → **instantly** in the browser: ✕, next seat, redraw, voice announcement. Then event `seat_taken` (actor `Code("camera")`) and `reroute` (actor `Agent("claude-eyes")`) to the job. If fewer than 2 seats remain, the job re-plans.
