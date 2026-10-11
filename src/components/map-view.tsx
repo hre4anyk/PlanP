@@ -44,8 +44,8 @@ function FitRoute({ route, start, destination }: { route: Route | null; start: L
   useEffect(() => {
     const routePoints = route?.legs.flatMap((leg) => leg.path) ?? [];
     const points = routePoints.length > 1 ? routePoints : destination ? [start, destination] : [start];
-    if (points.length > 1) map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng])), { padding: [40, 40], maxZoom: 16 });
-    else map.setView([start.lat, start.lng], 15);
+    if (points.length > 1) map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng])), { padding: [40, 40], maxZoom: 16, animate: false });
+    else map.setView([start.lat, start.lng], 15, { animate: false });
   }, [map, route, start, destination]);
   return null;
 }
@@ -77,7 +77,7 @@ function TapToChoose({ onPick }: { onPick: (point: LatLng) => void }) {
 function FollowFocus({ focus }: { focus: LatLng | null | undefined }) {
   const map = useMap();
   useEffect(() => {
-    if (focus) map.setView([focus.lat, focus.lng], 17, { animate: true });
+    if (focus) map.setView([focus.lat, focus.lng], 17, { animate: false });
   }, [map, focus]);
   return null;
 }
@@ -91,6 +91,7 @@ export default function MapView({ lots, chain, currentIndex, destination, start,
       zoom={14}
       className="h-full w-full"
       zoomControl={false}
+      zoomAnimation={false}
       attributionControl
     >
       <TileLayer

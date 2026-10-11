@@ -61,7 +61,10 @@ export function CarApp() {
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Show the status card from the top whenever the plan changes.
-  useEffect(() => panelRef.current?.scrollTo({ top: 0 }), [trip?.currentIndex, trip?.chain.length]);
+  // Braces matter: Chrome's scrollTo returns a promise, and an effect may only return a cleanup function.
+  useEffect(() => {
+    panelRef.current?.scrollTo({ top: 0 });
+  }, [trip?.currentIndex, trip?.chain.length]);
 
   const lots = useMemo(() => withFullLots(LOTS, trip?.fullIds ?? []), [trip?.fullIds]);
 
