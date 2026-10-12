@@ -10,7 +10,6 @@ import { walkMinutes } from "@/logic/geo";
 import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
-import { RoutePlanBar } from "@/components/route-plan-bar";
 import { ArrivalPopup } from "@/components/arrival-popup";
 import { Fundy, feedFundy } from "@/components/fundy";
 import { appleMapsUrl, googleMapsUrl } from "@/logic/maps";
@@ -435,9 +434,6 @@ export function CarApp() {
             </div>
           );
         })()}
-        {trip && trip.chain.length > 0 && journey.status !== "ready" && (
-          <RoutePlanBar chain={trip.chain} currentIndex={trip.currentIndex} lots={lotById} />
-        )}
         {journey.status === "loading" && (
           <span className="absolute inset-x-4 top-16 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
             Loading Street View and parking analysis{trip?.chain[trip.currentIndex] ? ` for Plan ${trip.chain[trip.currentIndex].label}` : " along your drive"}…
@@ -531,7 +527,7 @@ export function CarApp() {
 
           {journey.status === "unavailable" && <p className="text-sm text-muted-foreground">Street View: {journey.message}</p>}
 
-          {journey.status === "ready" && <Fundy compact />}
+          {journey.status === "ready" && <Fundy />}
         </div>
 
         {trip && parked && (
