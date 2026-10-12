@@ -1,14 +1,24 @@
-# Submission draft — Multi Model Hackathon (SF Tech Week)
+# Submission — Multi Model Hackathon (SF Tech Week, Oct 11 2026)
 
-One section per form field, ready to paste. Update the numbers after the final demo run.
+One section per form field, ready to paste. The judging criterion each answer serves is noted in *italics* (delete before pasting).
 
 ## Project name
 
 Plan P
 
+## Tagline
+
+Park effortlessly. Pitch confidently. Plan P's got you covered.
+
 ## Pitch
 
-Plan P is a hands-free parking co-pilot: it lines up backup spots before you arrive, and when a camera sees your spot get taken or you say "it's full", it instantly reroutes you to Plan B and tells you out loud. It works for your car (a backup chain of garages near your meeting) and, in our live demo, for you (finding a free chair in a crowded room).
+*Problem people care about, novelty, demo*
+
+You're driving to the most important meeting of your life, in a city you don't know. You don't know where to park, you can't be late, and you haven't rehearsed. Plan P is a hands-free copilot for exactly that drive.
+
+Tap one button and talk. Plan P asks where you're going, finds your parking plans (A, B, C… near the door) and asks "Let's go?". As you drive, Claude reads Google Street View photos of the curb at each plan and marks it green (free to park), red (can't park: hydrant, red curb, bus stop) or orange (occupied). Meanwhile the voice uses the dead time of the drive to rehearse the four questions every investor asks: what you do, the problem, your vision, and why your team. Before you arrive, Claude scores the whole pitch and gives you one fix. At each plan, the colour of the curb decides what happens next: green, park here; red or orange, Plan P tells you why and takes you to the next plan. You never touch the phone.
+
+SF drivers lose 83 hours a year looking for parking (INRIX), and nobody walks into a meeting wishing they'd rehearsed less. Plan P solves both on the same drive, for about 45 cents.
 
 ## Code repository
 
@@ -16,25 +26,55 @@ https://github.com/hre4anyk/PlanP
 
 ## Demo
 
-- Live: _Netlify link_
-- Video (4 min: Park me in a real room, Park my car on real SF streets): _link_
+- **Live (iPhone, Safari):** https://getplanp.netlify.app/car (tap "Talk to Plan P", say "2 South Park Street")
+- **Video:** _link_ (the full drive: Frontier Tower → 2 South Park, four questions, pitch score, red curb → Plan B, green curb → park)
 
 ## Models used and why
 
-- **Claude Opus 5.5 (Anthropic): the brain.** Picks the backup chain and explains each choice in one sentence: for chairs, closest, unblocked and matching your wish ("near the window"); for garages, walk time vs. price, closing time vs. meeting length, height clearance and permit rules. It also reads photos: when someone sits in your chair, it decides whether that's you or someone else (from a clothing description, no faces). It's the strongest reasoner with vision, and it's called only when something changes.
-- **OpenAI gpt-realtime-2.1-mini (OpenAI): the voice.** Speech in and speech out in one model, fast and interruptible, so a stressed driver can just talk. It turns "find me a spot" or "ugh, it's full" into tool calls on Plan P, and speaks every change of plan. The mini version keeps voice to a few cents per session.
-- Plus a free on-device vision tool (MediaPipe object detector) that watches the camera for chairs and people, so neither AI model has to look at every frame.
+*Multi-model integration (25%)*
+
+| Model | Job | Why this model |
+|---|---|---|
+| **Claude Opus 5.5** (Anthropic) | **The eyes:** reads each Street View photo facing the curb and returns a structured verdict: free to park / can't park / occupied, what's there (meter, hydrant, red curb, driveway, bike lane), a one-line reason and a box around the judged curb. | The strongest vision reasoner we tested on messy street scenes and parking rules; structured output means the app can act on every answer. Effort `low` keeps it ~1 cent a photo. |
+| **Claude Opus 5.5** as an **Anbaric agent** (`claude-coach`) | **The judge:** scores the founder's whole spoken pitch 1–10 on clarity, proof and confidence, with what landed and one fix, using the founder's context. | Judging a pitch needs reasoning and honesty, not speed. It runs as an audited job on Anbaric, with Claude called directly as a fallback after 13 s. |
+| **OpenAI gpt-realtime-2.1-mini** | **The voice:** speech in, speech out, over WebRTC. It runs the whole conversation and drives the app through four tools: `set_destination`, `start_drive`, `save_answer`, `i_parked`. | Natural, interruptible, low-latency speech in one model, built for a driver who can't look at a screen. The mini version keeps voice to cents per trip. Noise filtering and semantic turn detection handle a loud car or a stage. |
+| **gpt-4o-mini-transcribe** (inside the Realtime session) | Transcribes what the founder says, so his exact answers reach Claude and appear on screen. | Cheap and accurate enough; Claude judges his real words, not the voice model's paraphrase. |
 
 ## Why multiple models beat multiple apps
 
-A voice isn't a brain, and a brain isn't a voice. The speech-to-speech model gives a natural, interruptible conversation but isn't the strongest at weighing prices, closing times and rules; Claude is, but it can't hold a live spoken conversation. In Plan P the voice model calls Claude as a tool mid-conversation, so the driver gets Claude's judgement at the speed of speech. The same goes for watching: the on-device detector notices instantly that someone sat in your Plan A chair but can't tell who it is, so Claude is asked one precise question at exactly that moment. Separate apps would each make you stop, look and tap. One system makes the reroute hands-free. Every decision, and which model made it, is recorded as an audited workflow on Anbaric.
+*Multi-model integration, novelty*
 
-A Park me session costs about $0.08 and a car trip about $0.13 at standard list prices.
+A voice isn't a pair of eyes, and neither is a judge. The realtime voice model is great at conversation but can't read a curb in a photo or judge a pitch with care; Claude is, but it can't hold a live spoken conversation with a driver. In Plan P they work as one loop, each passing work to the other:
+
+1. **Voice → app → Claude's eyes:** "2 South Park Street" becomes a destination; the app plans parking A–E; Claude has already read the curb photos along each drive.
+2. **Claude's eyes → app → voice:** when the drive reaches a plan, the last photo's colour goes back to the voice, which tells the driver to park or explains why it's moving to Plan B, and the app reroutes.
+3. **Voice → Claude the judge → voice:** the four spoken answers go to Claude as one pitch; its score and fix come back as speech, before the car arrives.
+
+With separate apps you'd stop, look at a parking app, tap, open a coaching app, type your pitch, and read the feedback. That's impossible while driving. One system turns a stressful drive into rehearsal time, hands-free, and every trip and every score is an audited job on Anbaric.
 
 ## Team contributions
 
-- _Your name_ (solo): product, design and engineering, built with Claude Code
+- **Nazar** (solo founder): product, design and engineering. Built with Claude Code (voice copilot, Street View + Claude pipeline, Anbaric engine) and Base44 (parking plans A–E, arrival popup, spot list and Fundy, the pixel dino that grows with your pitch score). Prelint reviewed every pull request against our PRD and architecture.
 
 ## What would you build next?
 
-Lot-side cameras: the same engine on existing garage cameras or a cheap phone on a pole, giving real-time free-space counts. That is how we get real availability data, alongside garage partners, SFMTA sensors and crowd-sourced "full" reports from other Plan P drivers' camera reads. Reserving and paying for the backup spot in advance, so Plan B is guaranteed. A fleet version for field-sales and home-service teams, where one missed appointment costs more than a year's subscription. Then CarPlay and Android Auto.
+*Production-ready and economics (15%)*
+
+- **Live availability:** Street View shows where parking is allowed, not whether a space is free right now. Next: drivers' phones confirm free and taken spaces as they pass (crowd-sourced), SFMTA meter and sensor data, and garage occupancy feeds.
+- **Calendar in, pitch out:** pull the meeting address, time and investor from the calendar invite, and tailor the questions to that fund.
+- **Reserve the backup:** book and pay for the Plan B garage in advance so it's guaranteed.
+- **Fundy streaks:** the dino grows across trips, turning pitch practice into a daily habit.
+- **CarPlay and Android Auto**, then more cities.
+
+**Unit economics at standard list prices (no discounts):**
+
+| Per trip | Cost |
+|---|---|
+| Voice, ~10 min (gpt-realtime-2.1-mini + transcription) | ~$0.15 |
+| Street View photos for one parking plan (20 × $0.007) | ~$0.14 |
+| Claude reading those photos (Opus 5.5, effort low) | ~$0.13 |
+| Claude scoring the pitch (one call) | ~$0.01 |
+| **Typical trip (one plan read live)** | **≈ $0.45** |
+| Each extra plan (red/orange → next) | +$0.27 |
+
+Curb verdicts belong to the street, not the driver, so they're cached and shared: the demo route was read once for $0.63 and replays for free. The more drivers, the cheaper each trip. At $9.99/month for founders and sales teams who drive to meetings, a heavy user (20 trips) costs about $9 today, falling with caching. The code is typed TypeScript with 38 unit tests, every key stays on the server, and every external call has a fallback.

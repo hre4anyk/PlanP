@@ -4,26 +4,26 @@ import { SnakeRoute } from "@/components/snake-route";
 const steps = [
   {
     n: "01",
-    title: "Pick your meeting",
-    body: "Choose where you need to be. Plan P finds the garages within a short walk of the door.",
+    title: "Say where you're going",
+    body: "Tap once and talk. Plan P finds your parking plans A, B, C near the door and asks: “Let's go?”",
   },
   {
     n: "02",
-    title: "Get your backup chain",
-    body: "Plan A, B and C, ranked by shortest walk, drawn as one route. Your backups are planned before you leave.",
+    title: "Rehearse on the way",
+    body: "Four questions every investor asks, while you drive. Claude scores your whole pitch and gives you one fix before you arrive.",
   },
   {
     n: "03",
-    title: "Lot full? One tap.",
-    body: "Hit the big button and keep driving. The route already continues to Plan B. No new search, no detour.",
+    title: "The curb decides",
+    body: "Claude reads Street View photos of each curb. Green: park here. Red or orange: Plan P tells you why and takes you to Plan B.",
   },
 ];
 
 const calm = [
-  { title: "One big button", body: "Sized for a thumb, not a fingertip. One action on screen at a time." },
-  { title: "It talks to you", body: "“Plan A is full. Heading to Plan B.” You keep your eyes on the road." },
+  { title: "Hands-free", body: "One button to start. Everything else happens by voice, so your eyes stay on the road." },
+  { title: "It reads the street", body: "Hydrant, red curb, bus stop, bike lane or a free space: every photo gets a verdict and a walk time." },
+  { title: "Mic off when it's loud", body: "One tap and nothing interrupts Plan P. Tap again to answer." },
   { title: "Your maps app, your call", body: "Open turn-by-turn directions in Apple Maps or Google Maps at any point." },
-  { title: "Never runs out", body: "If every lot is full, the chain grows. Plan D, E and F get added to the end." },
 ];
 
 export default function Home() {
@@ -33,16 +33,19 @@ export default function Home() {
       <section className="relative">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <p className="eyebrow">For drivers with somewhere to be</p>
+            <p className="eyebrow">For founders driving to the meeting that matters</p>
             <h1 className="mt-6 max-w-3xl text-balance text-5xl leading-[1.02] font-bold sm:text-6xl lg:text-[4.25rem]">
-              The lot is full. <span className="text-primary">You already have Plan B.</span>
+              Park effortlessly. <span className="text-primary">Pitch confidently.</span>
             </h1>
             <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              Plan P lines up backup parking before you leave. If your garage is full, tap once and keep
-              driving to the next one.
+              Plan P&apos;s got you covered: a hands-free voice copilot that lines up parking near the door, reads
+              every curb from Street View, and rehearses your pitch on the drive.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-4">
-              <a href="#how" className={buttonVariants({ size: "lg" })}>
+              <a href="/car" className={buttonVariants({ size: "lg" })}>
+                🎙 Talk to Plan P
+              </a>
+              <a href="#how" className={buttonVariants({ size: "lg", variant: "ghost" })}>
                 See how it works
               </a>
             </div>
@@ -56,12 +59,12 @@ export default function Home() {
       <section className="border-y border-border bg-surface">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-16 sm:px-6 md:grid-cols-2 md:gap-16 md:py-20">
           <h2 className="text-3xl leading-tight font-bold sm:text-4xl">
-            Parking apps help you plan. Nothing helps when the plan fails.
+            Lost, late and unrehearsed, on the way to the most important pitch of your life.
           </h2>
           <div className="flex flex-col gap-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             <p>
-              You&apos;re five minutes from a meeting and the garage is full. You can&apos;t search while
-              driving, so you circle. Every wrong turn makes you later.
+              You&apos;re driving to an investor in a city you don&apos;t know. You can&apos;t search for
+              parking while driving, so you circle, and the minutes you meant to spend rehearsing are gone.
             </p>
             <p>
               San Francisco drivers lose 83 hours a year looking for parking. More than 4 in 10 Americans
@@ -76,7 +79,7 @@ export default function Home() {
       <section id="how" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28">
         <p className="eyebrow">How it works</p>
         <h2 className="mt-4 max-w-2xl text-3xl leading-tight font-bold sm:text-4xl">
-          Your backup is planned before you need it.
+          One drive. Parked, on time, and ready to pitch.
         </h2>
         <ol className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
           {steps.map((s) => (
@@ -125,7 +128,7 @@ export default function Home() {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-8 text-xs text-subtle sm:px-6">
           <span>Plan P</span>
-          <span>Parking data in this demo is simulated.</span>
+          <span>Street View photos are historical; garage availability in this demo is simulated.</span>
         </div>
       </footer>
     </div>

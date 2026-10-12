@@ -11,22 +11,18 @@ describe("markCurrentFull", () => {
     const next = markCurrentFull(trip, salesforce, LOTS);
     expect(next.currentIndex).toBe(1);
     expect(next.fullIds).toEqual([trip.chain[0].id]);
-    expect(next.chain.slice(0, 5)).toEqual(trip.chain);
+    expect(next.chain.slice(0, 3)).toEqual(trip.chain);
   });
 
   it("grows the chain before backups run out", () => {
     let trip = startTrip(salesforce, LOTS);
-    expect(trip.chain).toHaveLength(5); // A, B, C, D, E
+    expect(trip.chain).toHaveLength(3); // A, B, C
     trip = markCurrentFull(trip, salesforce, LOTS); // A full → B
-    expect(trip.chain).toHaveLength(5); // B, C, D, E still ahead
-    trip = markCurrentFull(trip, salesforce, LOTS); // B full → C
-    expect(trip.chain).toHaveLength(5); // C, D, E still ahead
-    trip = markCurrentFull(trip, salesforce, LOTS); // C full → D
-    expect(trip.chain).toHaveLength(5); // D, E still ahead
-    trip = markCurrentFull(trip, salesforce, LOTS); // D full → E, only E ahead
-    expect(trip.chain).toHaveLength(10); // grew: F, G, H, I, J added
-    expect(trip.chain.map((c) => c.label)).toEqual(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]);
-    expect(trip.chain[trip.currentIndex].label).toBe("E");
+    expect(trip.chain).toHaveLength(3); // B, C still ahead
+    trip = markCurrentFull(trip, salesforce, LOTS); // B full → C, only C ahead
+    expect(trip.chain).toHaveLength(6); // grew: D, E, F added
+    expect(trip.chain.map((c) => c.label)).toEqual(["A", "B", "C", "D", "E", "F"]);
+    expect(trip.chain[trip.currentIndex].label).toBe("C");
   });
 
   it("walks A → B → C → D… without repeating a lot, until every lot is full", () => {

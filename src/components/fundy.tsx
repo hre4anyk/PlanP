@@ -12,10 +12,29 @@ const STAGES = [
 
 const FED_EVENT = "fundy:fed";
 type Fed = { score: number; feedback: string };
+type FedEvent = Fed & { total: number };
 
-/** The voice copilot's pitch score feeds Fundy too (no typing while driving). */
+/**
+ * Feed Fundy a pitch score (10 points per point of score). Storage is the source of truth, so this
+ * works whether or not Fundy is on screen; returns the growth so the voice copilot can say it.
+ */
 export function feedFundy(fed: Fed) {
-  window.dispatchEvent(new CustomEvent<Fed>(FED_EVENT, { detail: fed }));
+  const before = savedScore();
+  const total = before + fed.score * 10;
+  try {
+    localStorage.setItem("fundy-score", String(total));
+  } catch {}
+  window.dispatchEvent(new CustomEvent<FedEvent>(FED_EVENT, { detail: { ...fed, total } }));
+  const from = getStage(before);
+  const to = getStage(total);
+  const next = STAGES.find((s) => s.min > total);
+  return {
+    grewBy: total - before,
+    points: total,
+    stage: to.name,
+    evolved: from.name !== to.name ? `${from.name} → ${to.name}` : null,
+    toNextStage: next ? `${next.min - total} points to ${next.name}` : "fully grown",
+  };
 }
 
 function savedScore() {
@@ -32,7 +51,7 @@ function getStage(score: number) {
 
 /** Fundy — a pixel dino mascot that grows when you practice your pitch.
  *  Type a pitch, Claude scores it, the score feeds Fundy and it grows. */
-export function Fundy() {
+export function Fundy({ compact = false }: { compact?: boolean }) {
   // Fundy only appears once a drive has started (after the page loaded), so reading storage here is safe.
   const [score, setScore] = useState(savedScore);
   const [pitch, setPitch] = useState("");
@@ -43,23 +62,16 @@ export function Fundy() {
   const [fed, setFed] = useState(false);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("fundy-score", String(score));
-    } catch {}
-  }, [score]);
-
-  useEffect(() => {
-    const onFed = (e: Event) => feed((e as CustomEvent<Fed>).detail);
+    const onFed = (e: Event) => {
+      const { total, ...data } = (e as CustomEvent<FedEvent>).detail;
+      setResult(data);
+      setScore(total);
+      setFed(true);
+      setTimeout(() => setFed(false), 1500);
+    };
     window.addEventListener(FED_EVENT, onFed);
     return () => window.removeEventListener(FED_EVENT, onFed);
   }, []);
-
-  function feed(data: Fed) {
-    setResult(data);
-    setScore((s) => s + data.score * 10);
-    setFed(true);
-    setTimeout(() => setFed(false), 1500);
-  }
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 100);
@@ -88,12 +100,47 @@ export function Fundy() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Scoring failed");
-      feed(data);
+      feedFundy(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scoring failed");
     } finally {
       setScoring(false);
     }
+  }
+
+  const sprite = (scale: number) => (
+    <div className="relative" style={{ transform: `translateY(${-Math.max(hopY, fedY)}px)` }}>
+      {stage.name === "Egg" ? <EggSprite scale={scale} /> : <DinoSprite scale={scale} blink={blink} pose={hopping ? "walkA" : "stand"} />}
+    </div>
+  );
+
+  // In the car: one row, no typing.
+  if (compact) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg bg-surface p-2">
+        <div className="relative flex h-14 w-20 shrink-0 items-end justify-center overflow-hidden rounded-md bg-[#0e0e14]">
+          {fed && (
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 animate-bounce">
+              <FoodSprite className="h-3" />
+            </div>
+          )}
+          {sprite(Math.min(stage.scale, 2))}
+          <Ground className="absolute right-0 bottom-0 left-0" />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="font-bold">🦖 Fundy · {stage.name}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {score} pts{result ? ` (+${result.score * 10})` : ""}
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-success transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="text-xs text-subtle">{nextStage ? `${nextStage.min - score} pts to ${nextStage.name} · grows with your pitch score` : "Fully grown"}</span>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -128,13 +175,7 @@ export function Fundy() {
             <FoodSprite className="h-4" />
           </div>
         )}
-        <div className="relative" style={{ transform: `translateY(${-Math.max(hopY, fedY)}px)` }}>
-          {stage.name === "Egg" ? (
-            <EggSprite scale={stage.scale} />
-          ) : (
-            <DinoSprite scale={stage.scale} blink={blink} pose={hopping ? "walkA" : "stand"} />
-          )}
-        </div>
+        {sprite(stage.scale)}
         <Ground className="absolute bottom-0 left-0 right-0" />
       </div>
 

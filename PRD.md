@@ -1,95 +1,104 @@
-# Plan P — Product Requirements Document (v1.0, simplified)
+# Plan P — Product Requirements Document (v1.1, hands-free)
 
-> **One line:** Tell Plan P where your meeting is. It routes you there, shows every legal street-parking stretch on the way with the walk to the door in minutes, keeps a garage as Plan B, and coaches your pitch while you drive.
+> **Park effortlessly. Pitch confidently. Plan P's got you covered.**
+> A hands-free voice copilot for the drive to your most important meeting: it lines up parking plans near the door, reads each curb from Google Street View, and rehearses your pitch on the way.
 
 **Event:** Multi Model Hackathon, SF Tech Week, Sunday Oct 11 2026, Frontier Tower, San Francisco. Live demo this evening.
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Submission draft:** [SUBMISSION.md](SUBMISSION.md) · **The user story we build for:** [idea.md](idea.md)
+**Live:** https://getplanp.netlify.app/car · **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Submission:** [SUBMISSION.md](SUBMISSION.md) · **User story:** [idea.md](idea.md)
 
-**What changed (2026-10-11 afternoon):** the founder simplified the product after testing. One mode only, **Park my car**. Park me (chairs) and the live street camera are removed (they stay in git history). Instead of our own camera, Plan P is a layer on top of **Google Street View**: Claude reads Street View photos along your route and marks where street parking is allowed.
+**History (2026-10-11):** morning, two modes (Park me with chairs, Park my car with a live camera). Afternoon, simplified to one mode over Google Street View (S1–S2b) with a voice copilot (S3–S4). Evening, the founder made it fully hands-free (S5): one button, four questions, one pitch score, and the curb colour at each plan decides the next step. Base44 added parking plans A–E, the arrival popup and Fundy.
 
 ---
 
 ## 1. The user (from idea.md)
 
-**Nazar, a defense founder**, driving to a 1:1 with an investor in San Francisco at a set time and place. He has never been to SF, doesn't know where to park, must not be late, and hasn't had time to research the investor. He's stressed.
+**Nazar, a defense founder**, driving to a 1:1 with an investor in San Francisco at a set time and place. He has never been to SF, doesn't know where to park, must not be late, and hasn't had time to rehearse. He's stressed, and he's driving: he can't look at or touch the phone.
 
-**Outcome:** he parks without circling, arrives on time, and walks in prepared for the most important pitch of his life.
+**Outcome:** he parks without circling, arrives on time, and walks in having rehearsed the pitch and fixed its weakest point.
 
-## 2. The experience
+## 2. The experience (built)
 
-1. **Open Plan P.** It finds where you are (GPS) right away.
-2. **"Where's your meeting, and when?"** Say it to the copilot, or type it.
-3. **The route appears**, and along its last stretch, **green P markers** for street parking that's allowed there (parking lane, meters, time-limited zones), each with **"4 min walk to your meeting"**. Red marks where you can't park (hydrant, red curb, driveway, bus stop). **Garage A, B, C** are the safety net.
-4. **While you drive, the copilot coaches you:** "Who are you meeting?" It researches the investor live, then asks the questions that investor is likely to ask, and gives you short feedback.
-5. **It also calls out parking as you approach:** "Street parking on your right in 200 metres, 4 minutes' walk." You see a free space on a green stretch and take it. If nothing's free, Garage A.
-6. **"I parked."** Plan P shows the walk to the door and whether you're on time.
+1. **Open Plan P, tap "🎙 Talk to Plan P".** The only control on screen.
+2. **"Where are you headed?"** He says "2 South Park Street". Plan P sets the destination and finds the parking plans A–E (garages within a walk of the door, ranked by walk time).
+3. **"I've found 5 places to park. The first is Brannan Square Garage, 3 minutes' walk. Let's go?"** He says yes; the drive starts: Street View photos in driving order, a minimap in the corner.
+4. **On the way, four questions**, one at a time, no comments in between: *What do you do? What is the problem you're solving? What is your vision? Why are you the best team to do this?* The drive holds before the last photo until all four are answered, so the questions always come before Plan A.
+5. **Claude scores the whole pitch** (1–10) with what landed and one fix; Plan P says it in two sentences, then where he's driving. Fundy, the pixel dino, grows with the score.
+6. **At each plan, the colour of the last photo decides** (Claude's verdict on the curb):
+   - **Green, free to park:** "Pull in and park here, 3 minutes' walk. Good luck."
+   - **Red, can't park** (hydrant, red curb, bus stop, bike lane) or **orange, occupied:** a popup, and Plan P says why and takes him to the next plan, whose drive loads automatically.
+7. **"I parked."** Done; walking directions to the door in Apple or Google Maps.
 
-**Important:** Street View photos are not live (they're months or years old). Plan P shows **where parking is allowed**; your eyes decide whether a space is free right now as you pass it.
+**Loud room or car:** a big **Mic on / Mic off** button. Mic off sends silence, so noise can't interrupt Plan P; tap it to answer. The voice session also filters noise and waits for a finished sentence before replying.
+
+**Important:** Street View photos are not live (months or years old). The verdict says what the curb allows and what the photo showed; the driver's eyes confirm.
 
 ## 3. How we win (judging rubric)
 
 | Criterion | Weight | How Plan P scores |
 |---|---|---|
-| Multi-model integration | **25%** | Two AI models, each doing what it's best at, in one loop: **OpenAI Realtime** is the voice you talk to while driving; it calls **Claude Opus 5.5** as a tool to research the investor on the web and to read Street View photos for parking rules. Neither app alone could coach you *and* find parking hands-free. |
-| Novel idea | 20% | Parking apps help you book a garage. Plan P turns Street View into a parking-rules layer along your exact route, measured in minutes from your meeting, plus a pitch coach for the drive. |
-| Production-ready, economics | 15% | About $0.40 per trip at list prices, falling with caching (§6). Everything has a fallback; typed code with tests; Prelint reviews every PR; Anbaric audit trail of each trip (sponsor). |
-| Demo under pressure | 20% | On stage: say the address, the route and green P markers appear with walk times; name the investor, the copilot researches and asks a tough question; answer it. |
-| Problem people care about | 20% | SF drivers lose 83 hours a year looking for parking (INRIX); more than 4 in 10 Americans have missed an appointment because they couldn't park. And everyone has walked into a meeting unprepared. Live waitlist via Base44 QR. |
+| Multi-model integration | **25%** | Three jobs, each to the model best at it, in one loop: **OpenAI Realtime** is the voice and drives the app through four tools; **Claude Opus 5.5** is the eyes (reads Street View photos, structured verdicts) and the judge (scores the spoken pitch, as an audited Anbaric agent). The voice's words go to Claude; Claude's verdicts and scores come back as speech. |
+| Novel idea | 20% | Parking apps book garages; coaching apps want you at a desk. Plan P turns Street View into a curb-by-curb parking layer at each plan and turns the dead time of the drive into pitch rehearsal, hands-free. |
+| Production-ready, economics | 15% | ≈ $0.45 per trip at list prices, falling with shared curb caching (§6). Typed code, 38 tests, keys server-side, a fallback for every external call, Prelint on every PR, Anbaric audit trail of every trip and score. |
+| Demo under pressure | 20% | On stage, one tap and voice only: destination → "Let's go?" → four questions while the street rolls by → pitch score → red curb, "taking you to Plan B" → green, "park here". Mic off for a loud room. |
+| Problem people care about | 20% | SF drivers lose 83 hours a year looking for parking (INRIX). Every founder knows the drive to a pitch: lost, late, unrehearsed. Founders and sales teams would pay $9.99/month. |
 
-**Submission fields** are drafted in [SUBMISSION.md](SUBMISSION.md). **Sponsors:** Prelint (reviews every PR), Anbaric (backend audit trail, S5), Base44 (waitlist QR, built by the founder).
+**Sponsors:** **Anbaric** hosts the trip engine (audited `trip` and `answer-review` jobs; Claude as the Anbaric agent `claude-coach`). **Base44** built plans A–E, the arrival popup, the spot list and Fundy on the same repo. **Prelint** reviews every pull request against this PRD and ARCHITECTURE.md.
 
 ## 4. Models
 
 | Role | Model | Does | Fallback |
 |---|---|---|---|
-| **Voice** | OpenAI `gpt-realtime-2.1-mini` | Speech-to-speech copilot: asks where/when and who, coaches the pitch, announces parking. Calls Plan P tools. | On-screen text box + buttons |
-| **Brain + eyes** | Claude `claude-opus-5-5` | Reads Street View photos (parking allowed? meters, time limits, red curb, hydrant, driveway); researches the investor with web search and writes likely questions. | Garages only; generic defense-VC questions from idea.md |
+| **Voice** | OpenAI `gpt-realtime-2.1-mini` (+ `gpt-4o-mini-transcribe`) | Speech-to-speech copilot. Tools: `set_destination`, `start_drive`, `save_answer`, `i_parked`. | Error shown on screen; tap Talk again |
+| **Eyes** | Claude `claude-opus-5-5`, effort low | Reads each Street View photo facing the curb: `free_to_park` / `cant_park` / `occupied`, kind, reason, box. | Server-side model fallbacks; garages remain the plan |
+| **Judge** | Claude `claude-opus-5-5` as Anbaric agent `claude-coach` | Scores the four-answer pitch 1–10: what landed, one fix, with the founder's context. | Claude called directly after 13 s |
 
-## 5. Sub-batches (each ends with a test the founder runs)
+## 5. Sub-batches (each ended with a test the founder ran)
 
-| # | Sub-batch | What you can test |
+| # | Sub-batch | Status |
 |---|---|---|
-| **S1** | **One mode, GPS, address → route.** Remove Park me and the street camera. Start = your GPS location. Type the meeting address (and optional time). Driving route on the map, arrival time, garage A/B/C near the destination with walk minutes. | On iPhone: open the link, allow location, the map centres on you. Type "1 Market St" → route from where you are, arrival time, Garage A/B/C with walk times. |
-| **S2** | **Street View parking layer.** Along the last ~10 minutes' walk of the route, Plan P samples points every ~60 m, fetches the Street View photo facing the curb, and Claude marks each: parking allowed / not, with the reason and the walk to the destination. | Type an address → within ~15 s green/red P markers appear along the last stretch, each with "N min walk". Tap one → the Street View photo, Claude's reason, the photo's date. |
-| **S2b** | **The demo route (POC), iPhone first.** One fixed trip: **995 Market St (Frontier Tower) → 2 S Park St (VC meeting)**. Street View photo IDs and Claude's verdicts for the whole drive are built once (`scripts/build-poc-route.mts`) and replayed instantly; photos still load live through our proxy. The drive auto-plays: quick until 10 minutes' walk from the meeting, then slower with verdicts. Other addresses still work live. | Open on iPhone, tap Plan my parking → the drive starts at once; the photo changes along Market St and 3rd St; "Driving · 16 min walk from the meeting", then green/red verdicts near South Park ("free parking · 3 min walk"); the bar fills grey → colours. |
-| **S3 ✓** | **Voice copilot (built 2026-10-11).** "Start copilot" opens a live voice session. It asks where and when (sets the route), then who you're meeting (Claude researches them live), then coaches you with that investor's likely questions, one at a time, with short feedback. Founder context from idea.md. | Tap Start copilot, say "1 Market Street at 3pm" → route appears. Say who you're meeting → within ~15 s it says what it found and asks a question. Answer it → feedback + next question. |
-| **S4 ✓** | **Voice and drive in sync (built 2026-10-11, founder's decisions).** The conversation is the clock: route set by voice → the car pulls away; the coach asks the **6 questions every fund asks** (`src/ai/questions.ts`, no investor research); after each answer **Claude scores it** (1–10, what landed, one fix) and the car drives the next stretch; the sixth answer arrives at South Park with the average score, a final tip and the closest free parking. No live parking alerts (Street View is not live; parking stays visual). Phase banner on the street view. Every trip and every scored answer is an audited **Anbaric** job, Claude scoring as the Anbaric agent `claude-coach`. | Tap Talk, say "2 South Park Street at 6:30" → banner "Driving · Question 1 of 6", car moves; answer → "Q1 8/10", car drives on, next question; after Q6 → "Arrived · pitch average 7/10". In Anbaric's console: the trip job and six answer-review jobs, each scored by claude-coach. |
-| ~~S4 (old)~~ | **On the drive.** Follow GPS; the copilot calls out green parking stretches as you approach them ("on your right in 200 m, 4 min walk"); "I parked" → walk to the door and on-time status; Open in Apple/Google Maps. | Drive (or simulate on a laptop): announcements as you near green markers; tap I parked → "6 min walk, you'll arrive 4 min early". |
-| **S5** | **Demo polish and sponsors.** Landing page for the new story, waitlist QR (Base44), Anbaric trip record, model trace, rehearsal, video, submission. | Full run-through on the stage setup, 3 times in a row. |
+| S1 | One mode, address → route, garage chain A/B/C with walk minutes | ✓ |
+| S2 | Street View parking layer: Claude marks each photo along the last stretch | ✓ |
+| S2b | The demo route 995 Market St → 2 S Park St, precomputed and replayed instantly, iPhone first | ✓ |
+| S3 | Voice copilot (OpenAI Realtime + tools) | ✓ |
+| S4 | Voice and drive in sync; Claude scores answers; Anbaric trip engine | ✓ |
+| **S5** | **Hands-free (founder's spec, evening):** only "Talk to Plan P"; voice sets the destination and asks "Let's go?"; four questions before Plan A; one score for the whole pitch; curb colour at each plan drives the next step (Base44 plans A–E + popup); Mic on/off; Fundy | ✓ live |
+| S6 | Demo video, rehearsal (3 clean runs), submission | in progress |
 
-## 6. Unit economics (one trip, list prices)
+**S5 test:** on the iPhone, tap Talk, say "2 South Park Street" → "found N places… Let's go?" → yes → banner "Driving to Plan A · Question 1 of 4" → answer four questions → "Pitch 7/10 · driving to Plan A" before the last photo → red: popup "Going to Plan B" and Plan P explains → green: "park here".
+
+## 6. Unit economics (one trip, standard list prices)
 
 | Step | Usage | Cost |
 |---|---|---|
-| Street View photos (Static API, ~$7 / 1,000) | ~15 photos along the last stretch | ~$0.11 |
-| Claude reads the photos (Opus 5.5, $4 / $20 per M tokens) | ~15 photos, ~1.2k in + ~100 out each | ~$0.10 |
-| Claude investor research (web search) | 1 call | ~$0.05 |
-| OpenAI Realtime voice (mini) | ~10 min of conversation | ~$0.15 |
-| **Total** | | **≈ $0.40 per trip** |
+| OpenAI Realtime voice (mini) + transcription | ~10 min | ~$0.15 |
+| Street View photos (Static API, $7 / 1,000) | 20 photos for one plan | ~$0.14 |
+| Claude reads the photos (Opus 5.5, $4 / $20 per M tokens, effort low) | 20 photos | ~$0.13 |
+| Claude scores the pitch | 1 call | ~$0.01 |
+| **Typical trip** | one plan read live | **≈ $0.45** |
+| Each extra plan (red/orange) | 20 photos + Claude | +$0.27 |
 
-Street View results for a street are cached and reused by every driver, so the photo + Claude cost per trip falls as usage grows. At $9.99/month for founders and sales teams who drive to meetings, a heavy user (20 trips) costs ~$8 at today's prices, falling with caching.
+Curb verdicts belong to the street, so they're cached and shared by every driver (the demo route was read once for $0.63 and replays free). At $9.99/month, a heavy user (20 trips) costs ~$9 today, falling with caching.
 
 ## 7. Data
 
-- **Garages:** the 12 SF garages (fake availability, made-up hours/clearance/rules), shown as Plan B near the destination.
-- **Street parking:** derived per request from Google Street View photos by Claude; not live availability.
-- **Founder context:** from idea.md (multi-polar world, cost of destruction → zero, Ukrainian drone experience, mesh network, 15,000 drones deployed, MOU with a German Mercedes-owned company, raising $5M for the unmanned "Black Manta" helicopter).
+- **Garages:** 24 SF garages (`src/data/lots.ts`, made-up availability, hours, clearance and rules); plans A–E by walk to the meeting.
+- **Curb verdicts:** from Google Street View photos read by Claude; not live availability.
+- **Founder context:** from idea.md (multi-polar world, cost of destruction → zero, Ukrainian drone experience, 15,000 drones deployed, MOU with a Mercedes-owned company, raising $5M for the Black Manta unmanned helicopter).
 
 ## 8. Out of scope
 
-Live space availability, payments/reservations, accounts, native app, cities other than SF, training our own model (Claude reads photos directly; no training needed).
+Live space availability, payments/reservations, accounts, native app, cities other than SF, investor-specific questions (removed in S4: four fixed questions are faster and always relevant).
 
 ## 9. Risks
 
 | Risk | What we do |
 |---|---|
-| Street View photos are old | Say so in the UI ("photo from 2024"); the product shows where parking is allowed, the driver's eyes judge free spaces |
+| Street View photos are old | Photo date on every frame; the verdict is a guide, the driver's eyes confirm |
 | Google terms restrict extracting data from Street View | Fine for a hackathon demo; check before launch; Mapillary (open licence) is the alternative |
-| Voice fails on stage | Text box + buttons do everything voice does |
-| GPS denied or indoors | Start from a preset point (Fell & Van Ness), say so |
-| Investor research finds nothing | Coach from idea.md with tough generic defense-VC questions |
-| Running out of time | S1–S3 are the demo; S4–S5 shrink |
+| Loud room interrupts the voice | Mic on/off button; noise reduction; semantic turn detection |
+| Anbaric engine slow or down | Claude scores directly after 13 s |
+| Live plan B–E loads slowly | Loading banner; the voice explains while it loads |
 
 ## 10. What we'd build next
 
-Live availability by crowdsourcing (drivers' phones confirm free/taken), SFMTA parking-regulation data as a cross-check, reserve the backup garage, calendar integration (meeting address and investor pulled from the invite), and a partnership path with Nexar's dashcam network.
+Live availability (crowd-sourced from drivers' phones, SFMTA sensors, garage feeds), calendar integration (address, time and investor from the invite; fund-specific questions), reserving the backup garage, Fundy streaks across trips, CarPlay and Android Auto, more cities.
