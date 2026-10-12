@@ -179,7 +179,8 @@
   font-size: 8px;
 }
 /* Standard OpenStreetMap tiles (free, no key), inverted to match the dark UI. */
-.leaflet-tile-pane {
+.leaflet-tile-pane img.leaflet-tile {
+  /* On the tile images, not the pane: Safari ignores filters on Leaflet's transformed pane. */
   filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.4);
 }
 .leaflet-container {
@@ -220,4 +221,14 @@
 .lot-open {
   color: var(--foreground);
   font-weight: 600;
+}
+
+/* Minimap in the street journey: keep the required map credit, but tiny. */
+.minimap .leaflet-control-attribution {
+  font-size: 7px !important;
+  line-height: 1.2;
+  padding: 0 2px;
+}
+.minimap .leaflet-control-attribution .leaflet-attribution-flag {
+  display: none !important;
 }

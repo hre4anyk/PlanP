@@ -13,6 +13,12 @@ export function distanceMetres(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+/** Estimated walk to the meeting, using the same straight-line distance for minutes and miles. */
+export function walkDistanceText(a: LatLng, b: LatLng): string {
+  const miles = distanceMetres(a, b) / 1609.344;
+  return `${walkMinutes(a, b)} min walk · ${miles.toFixed(2)} mi to destination`;
+}
+
 /** Whole walking minutes, at least 1. */
 export function walkMinutes(a: LatLng, b: LatLng): number {
   return Math.max(1, Math.round(distanceMetres(a, b) / WALK_METRES_PER_MIN));

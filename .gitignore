@@ -45,5 +45,6 @@ next-env.d.ts
 .netlify
 deno.lock
 
-# MediaPipe runtime + model, copied/downloaded by scripts/mediapipe-assets.mjs
+
+# Leftover on-device detector assets (feature removed)
 /public/mediapipe/
