@@ -6,13 +6,12 @@ import { StreetJourney, type CurbFrame } from "@/components/street-journey";
 import poc from "@/data/poc-route.json";
 import { Button } from "@/components/ui/button";
 import { LOTS, type LatLng } from "@/data/lots";
-import { walkMinutes } from "@/logic/geo";
+import { distanceMetres, walkMinutes } from "@/logic/geo";
 import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { ArrivalPopup } from "@/components/arrival-popup";
 import { Fundy, feedFundy } from "@/components/fundy";
-import { appleMapsUrl, googleMapsUrl } from "@/logic/maps";
 import { cn } from "@/lib/utils";
 import { PITCH_QUESTIONS } from "@/ai/questions";
 import { VoiceCopilot, type CopilotState } from "@/voice/copilot";
@@ -31,7 +30,6 @@ type Journey =
   | { status: "loading" }
   | { status: "ready"; frames: CurbFrame[]; route: Route; trace: JourneyTrace }
   | { status: "unavailable"; message: string };
-type Line = { id: number; who: "you" | "copilot"; text: string };
 /**
  * The conversation's stages (founder's spec): where → confirm the place → "Let's go?" → four questions
  * → debrief (score, Fundy, next stop) → quiet until he asks. The tools enforce the order.
@@ -41,11 +39,19 @@ type Pitch = { score: number; strong: string; fix: string; via: string } | { fai
 
 /** The demo meeting, however he says it: "2 South Park", "South Park Street", "2 S Park St"… */
 const isDemoAddress = (address: string) => /south\s*park|\b2\s*s\.?\s*park/i.test(address);
-const TONE_WORD = { free_to_park: "green, free to park", cant_park: "red, can't park", occupied: "orange, occupied" } as const;
+const TONE_WORD = {
+  free_to_park: "green, free to park",
+  cant_park: "red, can't park",
+  occupied: "orange, occupied",
+} as const;
 
 // The demo route (PRD S2b): built once by scripts/build-poc-route.mts, instant and free to replay.
 const POC_START: LatLng = { lat: poc.start.lat, lng: poc.start.lng };
-const POC_MEETING: Place = { name: "2 S Park St · VC meeting", lat: poc.meeting.lat, lng: poc.meeting.lng };
+const POC_MEETING: Place = {
+  name: "2 S Park St · VC meeting",
+  lat: poc.meeting.lat,
+  lng: poc.meeting.lng,
+};
 const isPocTrip = (start: LatLng, dest: LatLng) =>
   start.lat === POC_START.lat && start.lng === POC_START.lng && dest.lat === POC_MEETING.lat && dest.lng === POC_MEETING.lng;
 
@@ -63,13 +69,9 @@ export function CarApp() {
   // The voice copilot (hands-free): destination → "Let's go?" → drive → four questions → one score.
   const [copilotState, setCopilotState] = useState<CopilotState>("off");
   const [copilotDetail, setCopilotDetail] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
   const [answered, setAnswered] = useState(0);
   const [stage, setStageState] = useState<Stage>("where");
-  const [question, setQuestion] = useState<number | null>(null);
-  const [quietFrom, setQuietFrom] = useState(0);
   const stageRef = useRef<Stage>("where");
-  const lineId = useRef(0);
   const [scoring, setScoring] = useState(false);
   const [pitch, setPitch] = useState<Pitch | null>(null);
   const [muted, setMuted] = useState(false);
@@ -80,7 +82,6 @@ export function CarApp() {
   function setStage(next: Stage) {
     stageRef.current = next;
     setStageState(next);
-    if (next === "quiet") setQuietFrom(lineId.current);
   }
   // Tool calls run long after the session started: they read the latest state from here.
   const live = useRef({ trip, destination });
@@ -155,8 +156,16 @@ export function CarApp() {
       setJourney({
         status: "ready",
         frames: poc.frames as CurbFrame[],
-        route: { legs: [{ path: poc.path, driveMin: poc.driveMin }], approximate: false },
-        trace: { ms: 0, photos: poc.frames.length, costUsd: poc.buildCostUsd, precomputed: true },
+        route: {
+          legs: [{ path: poc.path, driveMin: poc.driveMin }],
+          approximate: false,
+        },
+        trace: {
+          ms: 0,
+          photos: poc.frames.length,
+          costUsd: poc.buildCostUsd,
+          precomputed: true,
+        },
       });
       return;
     }
@@ -166,7 +175,10 @@ export function CarApp() {
       if (!request.signal.aborted) setJourney({ status: "ready", ...next });
     } catch (err) {
       if (!request.signal.aborted) {
-        setJourney({ status: "unavailable", message: err instanceof Error ? err.message : "Street View is unavailable." });
+        setJourney({
+          status: "unavailable",
+          message: err instanceof Error ? err.message : "Street View is unavailable.",
+        });
       }
     }
   }
@@ -227,8 +239,20 @@ export function CarApp() {
    */
   async function scoreViaEngine(answers: string[]) {
     const body = (direct: boolean) =>
-      JSON.stringify({ tripRef: tripRef.current, direct, pitch: PITCH_QUESTIONS.map((question, i) => ({ question, answer: answers[i] || "(no answer)" })) });
-    const post = (direct: boolean) => fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json" }, body: body(direct) });
+      JSON.stringify({
+        tripRef: tripRef.current,
+        direct,
+        pitch: PITCH_QUESTIONS.map((question, i) => ({
+          question,
+          answer: answers[i] || "(no answer)",
+        })),
+      });
+    const post = (direct: boolean) =>
+      fetch("/api/coach", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: body(direct),
+      });
     const first = await post(false);
     const queued = first.ok ? await first.json() : null;
     if (queued && !queued.queued) return queued; // scored directly (no queue here)
@@ -260,19 +284,30 @@ export function CarApp() {
       const address = String(args.address ?? "");
       const time = typeof args.meeting_time === "string" && /^\d{1,2}:\d{2}$/.test(args.meeting_time) ? args.meeting_time : "";
       let dest: Place;
-      if (isDemoAddress(address)) dest = POC_MEETING;
-      else {
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
-        const data = await res.json();
-        if (!res.ok || !data.results?.length) return `Nothing found for "${address}" in San Francisco. Ask him to say the street number and street name again.`;
-        dest = data.results[0];
+      let spoken: string;
+      if (isDemoAddress(address)) {
+        dest = POC_MEETING;
+        spoken = "2 South Park Street, in SoMa";
+      } else {
+        // Google Places finds the candidates; Claude decides: one match, or ask which one.
+        const res = await fetch(`/api/place?q=${encodeURIComponent(address)}`);
+        const data = res.ok ? await res.json() : { decision: "none" };
+        if (data.decision === "choose") {
+          setStage("where");
+          const options = (data.options as (Place & { label: string })[]).map((o) => `${o.label} (${o.name})`).join("; ");
+          return `Several places match "${address}": ${options}. Ask him which one in one short question, naming them by their labels. When he answers, call set_destination again with the place and its street, e.g. "${data.options[0].name}".`;
+        }
+        if (data.decision !== "one") return `Nothing found for "${address}" in San Francisco. Ask him to say the place or the street address again.`;
+        const p = data.place as Place & { area?: string };
+        // The demo meeting is at 2 S Park St (a Blue Bottle is there too): use its precomputed drive.
+        dest = distanceMetres(p, POC_MEETING) < 60 ? { ...POC_MEETING, name: p.name } : { name: p.name, lat: p.lat, lng: p.lng };
+        spoken = `${p.name}${p.area ? `, in ${p.area}` : ""}`;
       }
       reset();
       setDestination(dest);
       setMeetingTime(time);
       setStage("confirm");
-      const spoken = dest === POC_MEETING ? "2 South Park Street, in SoMa, San Francisco" : dest.name;
-      return `Found: ${spoken}. Read this address back to him in one short sentence and ask if that's the right place. Don't mention parking yet. If he says yes, call confirm_destination; if not, ask for the exact address and call set_destination again.`;
+      return `Found: ${spoken}. Read this back to him in one short sentence and ask if that's the right place. Don't mention parking yet. If he says yes, call confirm_destination; if not, ask where exactly and call set_destination again.`;
     },
     confirm_destination: async () => {
       const { destination: dest } = live.current;
@@ -282,14 +317,19 @@ export function CarApp() {
       setTrip(next);
       answersRef.current = [];
       setAnswered(0);
-      setQuestion(null);
+
       setPitch(null);
       setStage("ready");
       tripRef.current = crypto.randomUUID();
       void fetch("/api/trip", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ event: "start", tripRef: tripRef.current, destination: dest.name, meetingTime: meetingTime || undefined }),
+        body: JSON.stringify({
+          event: "start",
+          tripRef: tripRef.current,
+          destination: dest.name,
+          meetingTime: meetingTime || undefined,
+        }),
       });
       if (!next.chain.length) return `No garage within a 15-minute walk. Say you'll look for street parking right by the door, then ask exactly: "Let's go?"`;
       const a = next.chain[0];
@@ -298,12 +338,12 @@ export function CarApp() {
     start_drive: async () => {
       const { trip: t, destination: dest } = live.current;
       if (stageRef.current === "where" || stageRef.current === "confirm" || !t || !dest)
-        return "Not yet: first confirm the address with him (confirm_destination), then ask \"Let's go?\".";
+        return 'Not yet: first confirm the address with him (confirm_destination), then ask "Let\'s go?".';
       if (stageRef.current !== "ready") return "The drive has already started. Don't repeat anything; carry on where you were.";
       const target = lotById.get(t.chain[t.currentIndex]?.id) ?? dest;
       void planJourney(dest, start, target, true);
       setStage("questions");
-      setQuestion(0);
+
       return `Driving now. Say in one short sentence that you'll use the drive to prepare his pitch with four questions, then ask Question 1 word for word: "${PITCH_QUESTIONS[0]}"`;
     },
     save_answer: async (args: Record<string, unknown>) => {
@@ -314,12 +354,11 @@ export function CarApp() {
       setAnswered(answersRef.current.filter(Boolean).length);
       const k = nextQuestion();
       if (k !== null) {
-        setQuestion(k);
         return `Saved. Say only "Got it." and ask Question ${k + 1} word for word: "${PITCH_QUESTIONS[k]}". Never repeat a question he has already answered unless he asks you to.`;
       }
 
       setStage("debrief");
-      setQuestion(null);
+
       setScoring(true);
       const t = live.current.trip;
       const plan = t?.chain[t.currentIndex];
@@ -327,12 +366,21 @@ export function CarApp() {
       const close = `Then say the next stop in one sentence: ${nextStop}. Then stop talking: from now on stay silent unless he asks you something or the app reports arriving at a stop.`;
       try {
         const data = await scoreViaEngine(answersRef.current);
-        setPitch({ score: data.score, strong: data.strong, fix: data.fix, via: data.via });
+        setPitch({
+          score: data.score,
+          strong: data.strong,
+          fix: data.fix,
+          via: data.via,
+        });
         const fundy = feedFundy({ score: data.score, feedback: data.fix });
         void fetch("/api/trip", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ event: "arrived", tripRef: tripRef.current, averageScore: data.score }),
+          body: JSON.stringify({
+            event: "arrived",
+            tripRef: tripRef.current,
+            averageScore: data.score,
+          }),
         });
         return JSON.stringify({
           say_in_order: [
@@ -360,19 +408,15 @@ export function CarApp() {
 
   async function startCopilot() {
     copilotRef.current?.stop();
-    setLines([]);
     setMuted(false);
     setStage("where");
-    setQuestion(null);
+
     const copilot = new VoiceCopilot({
       onState: (state, detail) => {
         setCopilotState(state);
         setCopilotDetail(detail ?? "");
       },
-      onTranscript: (who, text) => {
-        const id = ++lineId.current;
-        setLines((prev) => [...prev.slice(-5), { id, who, text }]);
-      },
+      onTranscript: () => {},
       tools,
     });
     copilotRef.current = copilot;
@@ -405,15 +449,15 @@ export function CarApp() {
             }
           />
         ) : (
-        <MapView
-          lots={lots}
-          chain={trip?.chain ?? []}
-          currentIndex={trip?.currentIndex ?? 0}
-          destination={destination}
-          start={start}
-          route={route}
-          onPickDestination={(point) => chooseDestination({ ...point, name: "Point on the map" })}
-        />
+          <MapView
+            lots={lots}
+            chain={trip?.chain ?? []}
+            currentIndex={trip?.currentIndex ?? 0}
+            destination={destination}
+            start={start}
+            route={route}
+            onPickDestination={(point) => chooseDestination({ ...point, name: "Point on the map" })}
+          />
         )}
         {/* Phase banner: what the drive and the conversation are doing right now */}
         {(() => {
@@ -423,130 +467,68 @@ export function CarApp() {
           if (parked) text = "Parked · good luck";
           else if (scoring) text = "Claude is scoring your pitch…";
           else if (pitch && "score" in pitch) text = `Pitch ${pitch.score}/10 · driving to ${to}`;
-          else if (journey.status === "ready" && voiceOn) text = `Driving to ${to} · Question ${Math.min(answered + 1, PITCH_QUESTIONS.length)} of ${PITCH_QUESTIONS.length}`;
+          else if (journey.status === "ready" && voiceOn)
+            text = `Driving to ${to} · Question ${Math.min(answered + 1, PITCH_QUESTIONS.length)} of ${PITCH_QUESTIONS.length}`;
           else if (trip && journey.status === "idle" && voiceOn) text = `${trip.chain.length || "No"} places found · say "Let's go"`;
           else if (!trip && voiceOn && stage === "confirm" && destination) text = `${destination.name.split(/[,·]/)[0].trim()}? · say "yes"`;
           else if (!trip && voiceOn) text = "Tell Plan P where you're going";
           if (!text || journey.status === "loading") return null;
           return (
             <div className="pointer-events-none absolute inset-x-2 top-9 z-[1000] flex justify-start pr-24 sm:top-12">
-              <span className={cn("rounded-lg px-3 py-1.5 text-sm font-bold shadow-lg", parked || pitch ? "bg-success text-black" : "bg-primary text-primary-foreground")}>{text}</span>
+              <span
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-sm font-bold shadow-lg",
+                  parked || pitch ? "bg-success text-black" : "bg-primary text-primary-foreground",
+                )}
+              >
+                {text}
+              </span>
             </div>
           );
         })()}
         {journey.status === "loading" && (
           <span className="absolute inset-x-4 top-16 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
-            Loading Street View and parking analysis{trip?.chain[trip.currentIndex] ? ` for Plan ${trip.chain[trip.currentIndex].label}` : " along your drive"}…
+            Loading Street View and parking analysis
+            {trip?.chain[trip.currentIndex] ? ` for Plan ${trip.chain[trip.currentIndex].label}` : " along your drive"}…
           </span>
         )}
         {journey.status !== "ready" && route?.approximate && (
-          <span className="absolute top-3 left-3 z-[1000] rounded-md bg-background/80 px-2.5 py-1 text-xs text-muted-foreground">
-            Approximate route
-          </span>
+          <span className="absolute top-3 left-3 z-[1000] rounded-md bg-background/80 px-2.5 py-1 text-xs text-muted-foreground">Approximate route</span>
         )}
-        {journey.status === "ready" && arrivalShown && lastFrame && (
-          <ArrivalPopup frame={lastFrame} nextPlanLabel={nextPlanLabel} />
-        )}
+        {journey.status === "ready" && arrivalShown && lastFrame && <ArrivalPopup frame={lastFrame} nextPlanLabel={nextPlanLabel} />}
       </div>
 
       <aside
-        className={cn(
-          "flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l",
-          journey.status === "ready" ? "max-h-[46dvh]" : "max-h-[50dvh]",
-        )}
+        className={cn("flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l", "max-h-[40dvh]")}
       >
-        <div ref={panelRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
-          {/* Hands-free: everything happens by voice */}
+        <div ref={panelRef} className="flex min-h-0 flex-1 flex-col gap-2 p-3">
+          {/* Hands-free: a small mic button and Fundy. Everything else is said, or shown on the street view. */}
           <audio ref={audioRef} autoPlay playsInline className="hidden" />
-          <div className="flex flex-col gap-1.5 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
-            {!voiceOn ? (
-              <>
-                <Button size="lg" className="h-16 text-lg" onClick={() => void startCopilot()}>
-                  🎙 Talk to Plan P
-                </Button>
-                <p className="text-center text-xs leading-snug text-muted-foreground">
-                  {copilotState === "error" ? <span className="text-destructive">{copilotDetail}</span> : "Hands-free: say where you're going, Plan P finds parking and preps your pitch on the drive."}
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={muted}
-                    onClick={() => {
-                      copilotRef.current?.setMuted(!muted);
-                      setMuted(!muted);
-                    }}
-                    className={cn(
-                      "flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-bold",
-                      muted ? "bg-destructive text-white" : "border-2 border-success bg-success/10 text-success",
-                    )}
-                  >
-                    {muted ? "🔇 Mic off · tap to talk" : "🎙 Mic on · tap to mute"}
-                  </button>
-                  <Button variant="ghost" size="sm" className="h-12" onClick={() => copilotRef.current?.stop()}>
-                    End
-                  </Button>
-                </div>
-                <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className={cn("size-2 rounded-full", muted ? "bg-destructive" : copilotState === "live" ? "animate-pulse bg-success" : "bg-amber-400")} />
-                  {copilotState === "connecting" ? "Connecting…" : muted ? "She can't hear you" : scoring ? "Claude is scoring your pitch…" : copilotState === "working" ? "Working on it…" : "Listening"}
-                </span>
-                {(() => {
-                  const last = lines[lines.length - 1];
-                  const answer = last?.who === "you" ? last.text : null;
-                  // During the questions: the question and your answer, nothing else.
-                  if (stage === "questions" && question !== null)
-                    return (
-                      <>
-                        <p className="text-base leading-snug font-semibold">
-                          <span className="text-primary">Q{question + 1}/{PITCH_QUESTIONS.length} </span>
-                          {PITCH_QUESTIONS[question]}
-                        </p>
-                        {answer && <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">You: {answer}</p>}
-                      </>
-                    );
-                  // After the pitch: only what you asked her since, if anything.
-                  const shown = stage === "debrief" || stage === "quiet" ? lines.filter((l) => l.id > quietFrom).slice(-2) : lines.slice(-2);
-                  return shown.map((l) => (
-                    <p key={l.id} className={cn("line-clamp-3 text-sm leading-snug", l.who === "you" ? "text-muted-foreground" : "text-foreground")}>
-                      <span className="font-semibold">{l.who === "you" ? "You: " : "Plan P: "}</span>
-                      {l.text}
-                    </p>
-                  ));
-                })()}
-              </>
-            )}
-            {pitch && "score" in pitch && (
-              <p className="line-clamp-3 text-sm leading-snug">
-                <span className="font-bold">Pitch {pitch.score}/10.</span> <span className="text-primary">Fix: {pitch.fix}</span>
-              </p>
-            )}
-          </div>
-
-          {journey.status === "unavailable" && <p className="text-sm text-muted-foreground">Street View: {journey.message}</p>}
-
-          {journey.status === "ready" && <Fundy />}
+          {!voiceOn ? (
+            <Button size="lg" className="h-12 text-base" onClick={() => void startCopilot()}>
+              🎙 Talk to Plan P
+            </Button>
+          ) : (
+            <button
+              type="button"
+              aria-pressed={muted}
+              onClick={() => {
+                copilotRef.current?.setMuted(!muted);
+                setMuted(!muted);
+              }}
+              className={cn(
+                "flex h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold",
+                muted ? "bg-destructive text-white" : "border-2 border-success bg-success/10 text-success",
+                copilotState === "connecting" && "opacity-60",
+              )}
+            >
+              <span className={cn("size-2 rounded-full", muted ? "bg-white" : copilotState === "live" ? "animate-pulse bg-success" : "bg-amber-400")} />
+              {copilotState === "connecting" ? "Connecting…" : muted ? "🔇 Mic off · tap to talk" : "🎙 Mic on · tap to mute"}
+            </button>
+          )}
+          {copilotState === "error" && <p className="text-center text-xs text-destructive">{copilotDetail}</p>}
+          <Fundy />
         </div>
-
-        {trip && parked && (
-          <div className="border-t border-border p-3">
-            <div className="flex h-10 items-center justify-center rounded-xl bg-success/15 text-base font-bold text-success">
-              ✓ Parked — you&apos;ve arrived!
-            </div>
-            {destination && (
-              <div className="mt-2 flex gap-3">
-                <a href={appleMapsUrl(destination, "walking")} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg border border-input py-2.5 text-center text-sm font-medium text-foreground hover:bg-white/5">
-                  Walk to meeting in Maps
-                </a>
-                <a href={googleMapsUrl(destination, "walking")} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg border border-input py-2.5 text-center text-sm font-medium text-foreground hover:bg-white/5">
-                  Google Maps walk
-                </a>
-              </div>
-            )}
-          </div>
-        )}
       </aside>
     </div>
   );

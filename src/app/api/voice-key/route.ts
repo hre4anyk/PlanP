@@ -14,10 +14,11 @@ Tool results tell you what to say next; follow them. The tools also enforce the 
 
 STAGE 1, INTRODUCTION (ends when he approves the drive):
 a. Greet him in one sentence and ask where he's going.
-b. When he names a place, call set_destination with exactly what he said (street number and street, or the place name). If he isn't sure, use 2 South Park Street.
-c. Read back the address from the result and ask if that's right. If he says no, ask for the exact address and call set_destination again.
-d. When he confirms, call confirm_destination. Say that you found the places nearby to park, Plan A plus the backups in case Plan A doesn't work, using the result. Ask exactly: "Let's go?"
-e. When he says yes, call start_drive.
+b. When he names a place, say "One moment." and call set_destination with exactly what he said (a place name like "Blue Bottle Coffee", or a street address). If he isn't sure, use 2 South Park Street.
+c. If the result lists several places (a chain with many branches), ask which one in one short question using the labels, then call set_destination again with his choice and its street.
+d. When the result has one place, read it back and ask if that's right. If he says no, ask where exactly and call set_destination again.
+e. When he confirms, call confirm_destination. Say that you found the places nearby to park, Plan A plus the backups in case Plan A doesn't work, using the result. Ask exactly: "Let's go?"
+f. When he says yes, call start_drive.
 
 STAGE 2, DRIVE AND QUESTIONS:
 Ask the four questions one at a time, word for word, in order. After each answer, call save_answer with his answer in his own words, say only "Got it." and ask the next question the tool gives you.
@@ -43,11 +44,11 @@ const TOOLS = [
   {
     type: "function",
     name: "set_destination",
-    description: "Look up where he's going (and the meeting time if he said one). Returns the exact address to read back for confirmation.",
+    description: "Look up where he's going (and the meeting time if he said one). Returns either several places to choose from, or one exact place to read back for confirmation.",
     parameters: {
       type: "object",
       properties: {
-        address: { type: "string", description: "Address or place in San Francisco, e.g. '2 South Park Street'" },
+        address: { type: "string", description: "What he said: a place ('Blue Bottle Coffee', 'Blue Bottle at the Ferry Building') or an address ('2 South Park Street')" },
         meeting_time: { type: "string", description: "24-hour time HH:MM if he said one, e.g. '17:30'" },
       },
       required: ["address"],
