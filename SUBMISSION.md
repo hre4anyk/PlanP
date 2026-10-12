@@ -37,7 +37,7 @@ https://github.com/hre4anyk/PlanP
 |---|---|---|
 | **Claude Opus 5.5** (Anthropic) | **The eyes:** reads each Street View photo facing the curb and returns a structured verdict: free to park / can't park / occupied, what's there (meter, hydrant, red curb, driveway, bike lane), a one-line reason and a box around the judged curb. | The strongest vision reasoner we tested on messy street scenes and parking rules; structured output means the app can act on every answer. Effort `low` keeps it ~1 cent a photo. |
 | **Claude Opus 5.5** as an **Anbaric agent** (`claude-coach`) | **The judge:** scores the founder's whole spoken pitch 1–10 on clarity, proof and confidence, with what landed and one fix, using the founder's context. | Judging a pitch needs reasoning and honesty, not speed. It runs as an audited job on Anbaric, with Claude called directly as a fallback after 13 s. |
-| **OpenAI gpt-realtime-2.1-mini** | **The voice:** speech in, speech out, over WebRTC. It runs the whole conversation and drives the app through four tools: `set_destination`, `start_drive`, `save_answer`, `i_parked`. | Natural, interruptible, low-latency speech in one model, built for a driver who can't look at a screen. The mini version keeps voice to cents per trip. Noise filtering and semantic turn detection handle a loud car or a stage. |
+| **OpenAI gpt-realtime-2.1-mini** | **The voice:** speech in, speech out, over WebRTC. It runs the whole conversation and drives the app through five tools: `set_destination`, `confirm_destination`, `start_drive`, `save_answer`, `i_parked`. | Natural, interruptible, low-latency speech in one model, built for a driver who can't look at a screen. The mini version keeps voice to cents per trip. Noise filtering and semantic turn detection handle a loud car or a stage. |
 | **gpt-4o-mini-transcribe** (inside the Realtime session) | Transcribes what the founder says, so his exact answers reach Claude and appear on screen. | Cheap and accurate enough; Claude judges his real words, not the voice model's paraphrase. |
 
 ## Why multiple models beat multiple apps
@@ -46,7 +46,7 @@ https://github.com/hre4anyk/PlanP
 
 A voice isn't a pair of eyes, and neither is a judge. The realtime voice model is great at conversation but can't read a curb in a photo or judge a pitch with care; Claude is, but it can't hold a live spoken conversation with a driver. In Plan P they work as one loop, each passing work to the other:
 
-1. **Voice → app → Claude's eyes:** "2 South Park Street" becomes a destination; the app plans parking A–E; Claude has already read the curb photos along each drive.
+1. **Voice → app → Claude's eyes:** "2 South Park Street" becomes a destination; the app plans parking A, B, C; Claude has already read the curb photos along each drive.
 2. **Claude's eyes → app → voice:** when the drive reaches a plan, the last photo's colour goes back to the voice, which tells the driver to park or explains why it's moving to Plan B, and the app reroutes.
 3. **Voice → Claude the judge → voice:** the four spoken answers go to Claude as one pitch; its score and fix come back as speech, before the car arrives.
 
@@ -54,7 +54,7 @@ With separate apps you'd stop, look at a parking app, tap, open a coaching app, 
 
 ## Team contributions
 
-- **Nazar** (solo founder): product, design and engineering. Built with Claude Code (voice copilot, Street View + Claude pipeline, Anbaric engine) and Base44 (parking plans A–E, arrival popup, spot list and Fundy, the pixel dino that grows with your pitch score). Prelint reviewed every pull request against our PRD and architecture.
+- **Nazar** (solo founder): product, design and engineering. Built with Claude Code (voice copilot, Street View + Claude pipeline, Anbaric engine) and Base44 (parking plans A, B, C, arrival popup, spot list and Fundy, the pixel dino that grows with your pitch score). Prelint reviewed every pull request against our PRD and architecture.
 
 ## What would you build next?
 

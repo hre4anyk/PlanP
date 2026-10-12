@@ -8,17 +8,17 @@ How the app is built, where each AI model is called, and why. Product requiremen
  PHONE BROWSER (Next.js client)               NEXT.JS SERVER (Netlify)                     PROVIDERS
  ┌───────────────────────────────┐           ┌───────────────────────────────┐
  │ 🎙 Talk to Plan P  (only button)│           │ POST /api/voice-key           │──► OpenAI (short-lived key,
- │ Voice copilot ◄═══════════════╪═ WebRTC ══╪═══════════════════════════════╪══►  instructions + 4 tools)
+ │ Voice copilot ◄═══════════════╪═ WebRTC ══╪═══════════════════════════════╪══►  instructions + 5 tools)
  │   tools: set_destination,      │           │                               │    gpt-realtime-2.1-mini
  │   start_drive, save_answer,    │           │ GET  /api/geocode             │──► OSM Nominatim
  │   i_parked                     │           │                               │
- │ Plans A–E (garage chain)       │           │ POST /api/curb                │──► Google Street View Static
+ │ Plans A, B, C (garage chain)       │           │ POST /api/curb                │──► Google Street View Static
  │ Street journey (photos, curb   │──route──► │   (live plans B–E)            │──► Claude Opus 5.5 (eyes)
  │   colour, minimap, hold)       │           │ GET  /api/streetview/photo    │──► Google (key stays here)
  │ Arrival popup → next plan      │           │                               │
  │ Pitch: 4 answers ──────────────┼─────────► │ POST /api/coach ─► queue ─────┼──► Netlify Blobs
  │   poll /api/coach/result       │           │ POST /api/trip  ─► queue      │        ▲  │
- │ Fundy (typed pitch, optional)  │─────────► │ POST /api/pitch               │──► Claude │  ▼
+ │ Fundy (grows with the score)   │           │                               │           │  ▼
  └───────────────────────────────┘           │ GET  /api/engine/queue ◄──────┼── ANBARIC ENGINE (polls 0.5 s)
                                              │ POST /api/engine/result ◄─────┼──  jobs: trip, answer-review
                                              └───────────────────────────────┘    agent claude-coach → Claude Opus 5.5
@@ -34,8 +34,8 @@ How the app is built, where each AI model is called, and why. Product requiremen
 src/
   app/
     page.tsx                       landing page
-    car/car-app.tsx                the app: copilot + tools, plans A–E, street journey, hold, arrival → next plan, banner
-    api/voice-key/route.ts         short-lived OpenAI Realtime key; instructions, 4 tools, noise reduction, semantic VAD
+    car/car-app.tsx                the app: copilot + tools, plans A, B, C, street journey, hold, arrival → next plan, banner
+    api/voice-key/route.ts         short-lived OpenAI Realtime key; instructions, 5 tools, noise reduction, semantic VAD
     api/geocode/route.ts           address → SF places (Nominatim)
     api/curb/route.ts              points → Street View metadata (Google car only) + photos → Claude (batches of 6) → verdicts
     api/streetview/photo/route.ts  photo proxy (netlify-vary on pano|heading so the CDN caches each photo separately)
@@ -43,7 +43,6 @@ src/
     api/coach/result/route.ts      the browser polls for Anbaric's score
     api/trip/route.ts              trip start / arrived → queue for Anbaric
     api/engine/queue|result        the engine's side of the queue (x-planp-token = ENGINE_TOKEN)
-    api/pitch/route.ts             Fundy: score a typed pitch (Base44)
   ai/
     models.ts                      model IDs and list prices
     questions.ts                   the four pitch questions
@@ -53,13 +52,13 @@ src/
   lib/engine-queue.ts              Netlify Blobs queue (enqueue, claim, complete, read), 4 s timeouts
   data/lots.ts                     24 fake SF garages
   data/poc-route.json              the demo route: path, photo IDs, headings, Claude's verdicts (scripts/build-poc-route.mts)
-  logic/                           geo, chain (plans A–E), trip (next plan), route (OSRM), eta, stretch, journey (Base44), maps links; *.test.ts
+  logic/                           geo, chain (plans A, B, C), trip (next plan), route (OSRM), eta, stretch, journey (Base44), maps links; *.test.ts
   components/
     street-journey.tsx             the main view: photos in driving order, curb box + verdict, autoplay with `holdAt`
     map-view.tsx                   Leaflet map / minimap
     arrival-popup.tsx              green / red / orange popup at the last photo (Base44)
-    route-plan-bar.tsx, spot-list.tsx, safe-map-container.tsx   (Base44)
-    fundy.tsx, fundy-sprites.tsx   the pixel dino that grows with pitch scores (Base44; fed by the voice score too)
+    safe-map-container.tsx         (Base44)
+    fundy.tsx, fundy-sprites.tsx   the pixel dino that grows with the voice pitch score (Base44); one compact row
 engine/                            the Anbaric app (separate package)
   src/main.ts                      starts the app
   src/machines.ts                  state machines `trip` (driving → arrived) and `answer-review` (submitted → scored)
@@ -86,18 +85,17 @@ type CoachScore = { score: number; strong: string; fix: string };   // the whole
 
 | Job | Where | Model | In → out |
 |---|---|---|---|
-| Voice copilot | browser ⇄ OpenAI over WebRTC | `gpt-realtime-2.1-mini`, voice `marin`, transcription `gpt-4o-mini-transcribe` | speech ⇄ speech; tools `set_destination`, `start_drive`, `save_answer`, `i_parked` |
+| Voice copilot | browser ⇄ OpenAI over WebRTC | `gpt-realtime-2.1-mini`, voice `marin`, transcription `gpt-4o-mini-transcribe` | speech ⇄ speech; tools `set_destination`, `confirm_destination`, `start_drive`, `save_answer`, `i_parked` |
 | Read the curb in Street View photos | `/api/curb` | `claude-opus-5-5`, effort `low`, JSON schema, server-side fallbacks | ≤ 6 photos per call → per photo `{ status, kind, reason, box }` |
 | Score the pitch | Anbaric agent `claude-coach` (`engine/`); fallback `/api/coach` `direct` | `claude-opus-5-5`, effort `low`, JSON schema | four Q&A → `{ score, strong, fix }` |
-| Fundy typed pitch | `/api/pitch` | `claude-opus-5-5`, effort `low` | text → `{ score, feedback }` |
 
 ## 5. Key flow (S5, hands-free)
 
-1. **Talk.** "🎙 Talk to Plan P" → `/api/voice-key` mints a short-lived key with the instructions, the four tools, `noise_reduction: far_field` and `turn_detection: semantic_vad (low)` → `copilot.ts` opens WebRTC (mic in, voice out, data channel `oai-events`). Banner: "Tell Plan P where you're going".
-2. **`set_destination(address)`.** "South Park" → the precomputed demo meeting; anything else → `/api/geocode`. `startTrip` builds plans A–E (garages within 15 min walk, by walk time); `/api/trip` queues `trip_start` for Anbaric. Returns the plans; the voice says how many and asks "Let's go?".
-3. **`start_drive()`** after "yes". Frontier Tower → 2 S Park St replays `poc-route.json` instantly; other trips load live via `journey.ts` → `/api/curb`. Returns Question 1.
-4. **`save_answer(n, answer)`** ×4. Stores the answer, returns the next question; no scoring in between. **Hold:** while the voice is on and the pitch isn't scored, `StreetJourney` stops at the second-to-last photo (`holdAt`), so the four questions always finish before Plan A.
-5. **Scoring** (after answer 4). `/api/coach` queues the whole pitch in Netlify Blobs and returns an id; the Anbaric engine (polling every 0.5 s) runs an `answer-review` job scored by `claude-coach` and posts the result; the browser polls `/api/coach/result` every 0.6 s. After 13 s without a score, `/api/coach` with `direct` asks Claude itself. Measured: ~2–8 s via Anbaric. The result feeds the banner ("Pitch 7/10 · driving to Plan A"), the panel, Fundy, and the voice (score, strong, fix, where we're driving). The hold is released.
+1. **Talk.** "🎙 Talk to Plan P" → `/api/voice-key` mints a short-lived key with the instructions, the five tools, `noise_reduction: far_field` and `turn_detection: semantic_vad (low)` → `copilot.ts` opens WebRTC (mic in, voice out, data channel `oai-events`). Banner: "Tell Plan P where you're going".
+2. **`set_destination(address)`.** "South Park" → the precomputed demo meeting; anything else → `/api/geocode` (Google Geocoding, SF only; OSM Nominatim fallback). Returns the exact address; she reads it back and asks if it's right. Banner: "2 S Park St? · say yes".
+3. **`confirm_destination()`** after his yes. `startTrip` builds plans A, B, C (garages within 15 min walk, by walk time; the chain grows if all fail); `/api/trip` queues `trip_start` for Anbaric. She says she found 3 places nearby, Plan A plus two backups in case Plan A doesn't work, and asks "Let's go?". **`start_drive()`** after "yes": Frontier Tower → 2 S Park St replays `poc-route.json` instantly; other trips load live via `journey.ts` → `/api/curb`. Returns Question 1. Each tool checks the stage (`where → confirm → ready → questions → debrief → quiet`) and refuses out-of-order calls.
+4. **`save_answer(answer)`** ×4. Stores the answer and returns the first unanswered question, so she never repeats one; no scoring in between. The panel shows only the current question and his answer. **Hold:** while the voice is on and the pitch isn't scored, `StreetJourney` stops at the second-to-last photo (`holdAt`), so the four questions always finish before Plan A.
+5. **Scoring** (after answer 4). `/api/coach` queues the whole pitch in Netlify Blobs and returns an id; the Anbaric engine (polling every 0.5 s) runs an `answer-review` job scored by `claude-coach` and posts the result; the browser polls `/api/coach/result` every 0.6 s. After 13 s without a score, `/api/coach` with `direct` asks Claude itself. Measured: ~2–8 s via Anbaric. The result feeds the banner ("Pitch 7/10 · driving to Plan A"), the panel, Fundy (`feedFundy` returns how much it grew), and the voice: score, strong, fix, Fundy's growth, the next stop; then she stays quiet unless asked. The hold is released.
 6. **Arrival at a plan** (last photo). The page sends the voice "[Plan P app] Arrived at Plan A… Last photo: red, can't park (bike lane: …). The app is taking him to Plan B…" (queued if it's speaking). Green → `parked`, "park here". Red/orange → Base44's popup and, after 3.5 s, `markCurrentFull` → the next plan's drive loads live from this garage; no hold on later plans.
 7. **Mic off** disables the mic track (silence), so noise can't interrupt; the voice keeps talking.
 
@@ -119,9 +117,9 @@ Earlier flows (S1 address form, S3 investor research, S4 one stretch per questio
 
 | Name | Used by | Status |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | `/api/curb`, `/api/coach`, `/api/pitch` | set (Netlify, local) |
+| `ANTHROPIC_API_KEY` | `/api/curb`, `/api/coach` | set (Netlify, local) |
 | `OPENAI_API_KEY` | `/api/voice-key` | set |
-| `GOOGLE_MAPS_API_KEY` | `/api/curb`, `/api/streetview/photo` | set |
+| `GOOGLE_MAPS_API_KEY` | `/api/curb`, `/api/streetview/photo`, `/api/geocode` (Street View Static + Geocoding APIs) | set |
 | `ENGINE_TOKEN` | `/api/engine/*` (shared with the Anbaric engine's `engine-token`) | set |
 | Anbaric secrets | `anthropic-key`, `engine-token`, `site-urls` | set |
 
@@ -150,4 +148,7 @@ One branch and pull request per sub-batch (PRD §5); Prelint reviews it; the fou
 | D13 | Four fixed questions, no per-answer scoring; Claude scores the whole pitch once, before Plan A (the drive holds at the second-to-last photo until then) | Founder: fewer interruptions, feedback on the pitch as a whole, always before arrival |
 | D14 | The last photo's colour at each plan drives the next step: green park, red/orange popup + next plan, and the voice says why | Founder: "the algo has a colour status for the last picture; based on this the agent takes next actions" |
 | D15 | Mic on/off button + noise reduction + semantic VAD | Founder: loud venue; nothing should interrupt the AI |
-| D16 | Fundy (Base44) is fed by the voice pitch score; its typed box stays optional | Founder: merge everything; gamification without breaking hands-free |
+| D16 | Fundy (Base44) is fed only by the voice pitch score; no typed pitch box | Founder: gamification without breaking hands-free; a clean panel |
+| D17 | Conversation stages enforced by the tools: where → read the address back → confirm → "3 places nearby… Let's go?" → four questions (never repeated) → debrief (score, fix, Fundy growth, next stop) → quiet unless asked or arriving | Founder: clear stages; no repeated questions; she stays quiet after the debrief |
+| D18 | Three parking plans (A + two backups; the chain grows if all fail); Google Geocoding first, OSM fallback | Founder: "3 points nearby in case Plan A doesn't work"; the right address every time |
+| D19 | One-screen panel: mic, the current question and your answer, the score, Fundy; no garage list, trip card or typed pitch | Founder: everything on one screen; the banner and the voice already say where you're heading |

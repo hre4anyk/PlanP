@@ -6,7 +6,7 @@
 **Event:** Multi Model Hackathon, SF Tech Week, Sunday Oct 11 2026, Frontier Tower, San Francisco. Live demo this evening.
 **Live:** https://getplanp.netlify.app/car · **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Submission:** [SUBMISSION.md](SUBMISSION.md) · **User story:** [idea.md](idea.md)
 
-**History (2026-10-11):** morning, two modes (Park me with chairs, Park my car with a live camera). Afternoon, simplified to one mode over Google Street View (S1–S2b) with a voice copilot (S3–S4). Evening, the founder made it fully hands-free (S5): one button, four questions, one pitch score, and the curb colour at each plan decides the next step. Base44 added parking plans A–E, the arrival popup and Fundy.
+**History (2026-10-11):** morning, two modes (Park me with chairs, Park my car with a live camera). Afternoon, simplified to one mode over Google Street View (S1–S2b) with a voice copilot (S3–S4). Evening, the founder made it fully hands-free (S5): one button, four questions, one pitch score, and the curb colour at each plan decides the next step. Base44 added parking plans A, B, C, the arrival popup and Fundy.
 
 ---
 
@@ -19,10 +19,10 @@
 ## 2. The experience (built)
 
 1. **Open Plan P, tap "🎙 Talk to Plan P".** The only control on screen.
-2. **"Where are you headed?"** He says "2 South Park Street". Plan P sets the destination and finds the parking plans A–E (garages within a walk of the door, ranked by walk time).
-3. **"I've found 5 places to park. The first is Brannan Square Garage, 3 minutes' walk. Let's go?"** He says yes; the drive starts: Street View photos in driving order, a minimap in the corner.
+2. **"Where are you headed?"** He says "2 South Park Street". Plan P looks up the exact address and reads it back: "2 South Park Street in SoMa, is that right?"
+3. **He says yes. "I found 3 places nearby to park. Plan A is Brannan Square Garage, 3 minutes' walk, and two backups in case Plan A doesn't work. Let's go?"** He says yes; the drive starts: Street View photos in driving order, a minimap in the corner.
 4. **On the way, four questions**, one at a time, no comments in between: *What do you do? What is the problem you're solving? What is your vision? Why are you the best team to do this?* The drive holds before the last photo until all four are answered, so the questions always come before Plan A.
-5. **Claude scores the whole pitch** (1–10) with what landed and one fix; Plan P says it in two sentences, then where he's driving. Fundy, the pixel dino, grows with the score.
+5. **Debrief:** Claude scores the whole pitch (1–10); Plan P says the score, what landed, the one fix, how much Fundy the pixel dino grew, and the next stop. **Then she stays quiet** unless he asks her something or he reaches a stop. Questions are never repeated unless he asks.
 6. **At each plan, the colour of the last photo decides** (Claude's verdict on the curb):
    - **Green, free to park:** "Pull in and park here, 3 minutes' walk. Good luck."
    - **Red, can't park** (hydrant, red curb, bus stop, bike lane) or **orange, occupied:** a popup, and Plan P says why and takes him to the next plan, whose drive loads automatically.
@@ -36,13 +36,13 @@
 
 | Criterion | Weight | How Plan P scores |
 |---|---|---|
-| Multi-model integration | **25%** | Three jobs, each to the model best at it, in one loop: **OpenAI Realtime** is the voice and drives the app through four tools; **Claude Opus 5.5** is the eyes (reads Street View photos, structured verdicts) and the judge (scores the spoken pitch, as an audited Anbaric agent). The voice's words go to Claude; Claude's verdicts and scores come back as speech. |
+| Multi-model integration | **25%** | Three jobs, each to the model best at it, in one loop: **OpenAI Realtime** is the voice and drives the app through five tools; **Claude Opus 5.5** is the eyes (reads Street View photos, structured verdicts) and the judge (scores the spoken pitch, as an audited Anbaric agent). The voice's words go to Claude; Claude's verdicts and scores come back as speech. |
 | Novel idea | 20% | Parking apps book garages; coaching apps want you at a desk. Plan P turns Street View into a curb-by-curb parking layer at each plan and turns the dead time of the drive into pitch rehearsal, hands-free. |
 | Production-ready, economics | 15% | ≈ $0.45 per trip at list prices, falling with shared curb caching (§6). Typed code, 38 tests, keys server-side, a fallback for every external call, Prelint on every PR, Anbaric audit trail of every trip and score. |
 | Demo under pressure | 20% | On stage, one tap and voice only: destination → "Let's go?" → four questions while the street rolls by → pitch score → red curb, "taking you to Plan B" → green, "park here". Mic off for a loud room. |
 | Problem people care about | 20% | SF drivers lose 83 hours a year looking for parking (INRIX). Every founder knows the drive to a pitch: lost, late, unrehearsed. Founders and sales teams would pay $9.99/month. |
 
-**Sponsors:** **Anbaric** hosts the trip engine (audited `trip` and `answer-review` jobs; Claude as the Anbaric agent `claude-coach`). **Base44** built plans A–E, the arrival popup, the spot list and Fundy on the same repo. **Prelint** reviews every pull request against this PRD and ARCHITECTURE.md.
+**Sponsors:** **Anbaric** hosts the trip engine (audited `trip` and `answer-review` jobs; Claude as the Anbaric agent `claude-coach`). **Base44** built plans A, B, C, the arrival popup, the spot list and Fundy on the same repo. **Prelint** reviews every pull request against this PRD and ARCHITECTURE.md.
 
 ## 4. Models
 
@@ -61,10 +61,11 @@
 | S2b | The demo route 995 Market St → 2 S Park St, precomputed and replayed instantly, iPhone first | ✓ |
 | S3 | Voice copilot (OpenAI Realtime + tools) | ✓ |
 | S4 | Voice and drive in sync; Claude scores answers; Anbaric trip engine | ✓ |
-| **S5** | **Hands-free (founder's spec, evening):** only "Talk to Plan P"; voice sets the destination and asks "Let's go?"; four questions before Plan A; one score for the whole pitch; curb colour at each plan drives the next step (Base44 plans A–E + popup); Mic on/off; Fundy | ✓ live |
+| **S5** | **Hands-free (founder's spec, evening):** only "Talk to Plan P"; voice sets the destination and asks "Let's go?"; four questions before Plan A; one score for the whole pitch; curb colour at each plan drives the next step (Base44 plans A, B, C + popup); Mic on/off; Fundy | ✓ live |
+| **S5b** | **Clean-up (founder, evening):** stages enforced by the tools; address read back and confirmed (Google Geocoding); 3 plans; panel shows only the current question and answer, everything on one screen; no garage list, trip card or typed pitch | ✓ |
 | S6 | Demo video, rehearsal (3 clean runs), submission | in progress |
 
-**S5 test:** on the iPhone, tap Talk, say "2 South Park Street" → "found N places… Let's go?" → yes → banner "Driving to Plan A · Question 1 of 4" → answer four questions → "Pitch 7/10 · driving to Plan A" before the last photo → red: popup "Going to Plan B" and Plan P explains → green: "park here".
+**S5 test:** on the iPhone, tap Talk, say "2 South Park Street" → she reads the address back → yes → "found 3 places nearby… Let's go?" → yes → banner "Driving to Plan A · Question 1 of 4" → answer four questions → "Pitch 7/10 · driving to Plan A" before the last photo → red: popup "Going to Plan B" and Plan P explains → green: "park here".
 
 ## 6. Unit economics (one trip, standard list prices)
 
@@ -81,7 +82,7 @@ Curb verdicts belong to the street, so they're cached and shared by every driver
 
 ## 7. Data
 
-- **Garages:** 24 SF garages (`src/data/lots.ts`, made-up availability, hours, clearance and rules); plans A–E by walk to the meeting.
+- **Garages:** 24 SF garages (`src/data/lots.ts`, made-up availability, hours, clearance and rules); plans A, B, C by walk to the meeting.
 - **Curb verdicts:** from Google Street View photos read by Claude; not live availability.
 - **Founder context:** from idea.md (multi-polar world, cost of destruction → zero, Ukrainian drone experience, 15,000 drones deployed, MOU with a Mercedes-owned company, raising $5M for the Black Manta unmanned helicopter).
 
