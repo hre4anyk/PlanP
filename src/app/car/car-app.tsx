@@ -6,8 +6,6 @@ import { StreetJourney, type CurbFrame } from "@/components/street-journey";
 import poc from "@/data/poc-route.json";
 import { Button } from "@/components/ui/button";
 import { LOTS, type LatLng } from "@/data/lots";
-import { nearestOpenLot } from "@/logic/chain";
-import { arrival, clock, meetingAt, spareText } from "@/logic/eta";
 import { walkMinutes } from "@/logic/geo";
 import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
@@ -52,28 +50,12 @@ const POC_MEETING: Place = { name: "2 S Park St · VC meeting", lat: poc.meeting
 const isPocTrip = (start: LatLng, dest: LatLng) =>
   start.lat === POC_START.lat && start.lng === POC_START.lng && dest.lat === POC_MEETING.lat && dest.lng === POC_MEETING.lng;
 
-/** "Heading to Plan B: Sutter-Stockton Garage. 3 min drive, 4 min walk." */
-function headingMessage(trip: Trip, route: Route | null, rerouted: boolean, destination: Place): string {
-  if (trip.exhausted && trip.fullIds.length === 0) {
-    const nearest = nearestOpenLot(destination, LOTS);
-    const drive = route?.legs[0]?.driveMin;
-    return `No garage within a 15-minute walk${nearest ? ` (closest: ${nearest.lot.name}, ${nearest.walkMin} min)` : ""}. Driving straight to ${destination.name}${drive ? `, ${drive} min` : ""}.`;
-  }
-  if (trip.exhausted) return "Every garage near your meeting is full. Look for street parking near the door.";
-  const item = trip.chain[trip.currentIndex];
-  const lot = lotById.get(item.id)!;
-  const drive = route?.legs[trip.currentIndex]?.driveMin;
-  const times = [drive ? `${drive} min drive` : null, item.distance].filter(Boolean).join(", ");
-  return `${rerouted ? "No problem. " : ""}Heading to Plan ${item.label}: ${lot.name}. ${times}.`;
-}
-
 export function CarApp() {
   const [destination, setDestination] = useState<Place | null>(null);
   const [meetingTime, setMeetingTime] = useState("");
   const start = POC_START;
   const [trip, setTrip] = useState<Trip | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
-  const [routedAt, setRoutedAt] = useState<Date | null>(null);
   const [journey, setJourney] = useState<Journey>({ status: "idle" });
   const [frameIndex, setFrameIndex] = useState(0);
   const [parked, setParked] = useState(false);
@@ -140,7 +122,6 @@ export function CarApp() {
     fetchRoute(stops).then((r) => {
       if (cancelled) return;
       setRoute(r);
-      setRoutedAt(new Date());
     });
     return () => {
       cancelled = true;
@@ -399,19 +380,6 @@ export function CarApp() {
     await copilot.start(audioRef.current!);
   }
 
-  const rerouted = (trip?.fullIds.length ?? 0) > 0;
-
-  // Arrival at the meeting door: drive to the current target, then walk.
-  let arrivalLine = "";
-  if (trip && destination && route && routedAt && !(trip.exhausted && trip.fullIds.length)) {
-    const target = trip.chain[trip.currentIndex];
-    const drive = route.legs[target ? trip.currentIndex : 0]?.driveMin ?? 0;
-    const walk = target ? walkMinutes(lotById.get(target.id)!, destination) : 0;
-    const a = arrival(routedAt, drive, walk, meetingAt(meetingTime, routedAt));
-    arrivalLine = `At the door ${clock(a.atDoor)}${a.spareMin !== null ? `, ${spareText(a.spareMin)}` : ""}.`;
-  }
-  const late = arrivalLine.includes("late");
-
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col lg:flex-row">
       <div key={journey.status === "ready" ? "journey" : "map"} className="relative min-h-0 flex-1">
@@ -561,53 +529,6 @@ export function CarApp() {
             )}
           </div>
 
-          {/* The trip in two lines: plans, then where you're heading */}
-          {trip && destination && (
-            <div role="status" aria-live="polite" className="flex flex-col gap-1.5 rounded-lg bg-surface p-2.5">
-              {trip.chain.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1">
-                  {trip.chain.map((item, i) => (
-                    <span
-                      key={item.id}
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-xs font-bold",
-                        i === trip.currentIndex && !trip.exhausted
-                          ? "bg-primary text-primary-foreground"
-                          : i < trip.currentIndex
-                            ? "bg-destructive/20 text-destructive line-through"
-                            : "bg-white/5 text-muted-foreground",
-                      )}
-                    >
-                      {item.label}
-                    </span>
-                  ))}
-                  <span className="ml-1 truncate text-xs text-muted-foreground">{trip.chain.length} parking plans</span>
-                </div>
-              )}
-              <p className={cn("text-sm leading-snug font-medium", trip.exhausted && trip.fullIds.length && "text-destructive")}>
-                {headingMessage(trip, route, rerouted, destination)}
-                {arrivalLine && <span className={cn("font-normal", late ? "text-destructive" : "text-muted-foreground")}> {arrivalLine}</span>}
-              </p>
-              {!parked && !trip.exhausted && (() => {
-                const target = trip.chain[trip.currentIndex] ? lotById.get(trip.chain[trip.currentIndex].id)! : destination;
-                return (
-                  <div className="flex items-center gap-3 text-xs">
-                    <a href={appleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                      Apple Maps →
-                    </a>
-                    <a href={googleMapsUrl(target)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                      Google Maps →
-                    </a>
-                    {journey.status === "ready" && (
-                      <span className="ml-auto font-mono text-[10px] text-subtle">
-                        Claude · {journey.trace.photos} photos · ${journey.trace.costUsd.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
           {journey.status === "unavailable" && <p className="text-sm text-muted-foreground">Street View: {journey.message}</p>}
 
           {journey.status === "ready" && <Fundy compact />}
