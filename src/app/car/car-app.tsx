@@ -11,6 +11,7 @@ import { loadJourney, type JourneyTrace } from "@/logic/journey";
 import { fetchRoute, type Route } from "@/logic/route";
 import { markCurrentFull, startTrip, withFullLots, type Trip } from "@/logic/trip";
 import { ArrivalPopup } from "@/components/arrival-popup";
+import { StreetLoading } from "@/components/street-loading";
 import { Fundy, feedFundy } from "@/components/fundy";
 import { cn } from "@/lib/utils";
 import { PITCH_QUESTIONS } from "@/ai/questions";
@@ -27,7 +28,7 @@ const lotById = new Map(LOTS.map((lot) => [lot.id, lot]));
 type Place = LatLng & { name: string };
 type Journey =
   | { status: "idle" }
-  | { status: "loading" }
+  | { status: "loading"; photos: number | null; startedAt: number }
   | { status: "ready"; frames: CurbFrame[]; route: Route; trace: JourneyTrace }
   | { status: "unavailable"; message: string };
 /**
@@ -70,6 +71,14 @@ export function CarApp() {
   const [copilotState, setCopilotState] = useState<CopilotState>("off");
   const [copilotDetail, setCopilotDetail] = useState("");
   const [answered, setAnswered] = useState(0);
+  // The side panel's transcript: the introduction's last exchange, then each question and his answer.
+  const [lines, setLines] = useState<{ who: "you" | "copilot"; text: string }[]>([]);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [asked, setAsked] = useState<number | null>(null);
+  const qaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    qaRef.current?.scrollTo({ top: qaRef.current.scrollHeight, behavior: "smooth" });
+  }, [lines, answers, asked]);
   const [stage, setStageState] = useState<Stage>("where");
   const stageRef = useRef<Stage>("where");
   const [scoring, setScoring] = useState(false);
@@ -169,9 +178,12 @@ export function CarApp() {
       });
       return;
     }
-    setJourney({ status: "loading" });
+    const startedAt = Date.now();
+    setJourney({ status: "loading", photos: null, startedAt });
     try {
-      const next = await loadJourney(from, target, dest, request.signal);
+      const next = await loadJourney(from, target, dest, request.signal, ({ photos }) => {
+        if (!request.signal.aborted) setJourney({ status: "loading", photos, startedAt });
+      });
       if (!request.signal.aborted) setJourney({ status: "ready", ...next });
     } catch (err) {
       if (!request.signal.aborted) {
@@ -317,6 +329,8 @@ export function CarApp() {
       setTrip(next);
       answersRef.current = [];
       setAnswered(0);
+      setAnswers([]);
+      setAsked(null);
 
       setPitch(null);
       setStage("ready");
@@ -343,6 +357,7 @@ export function CarApp() {
       const target = lotById.get(t.chain[t.currentIndex]?.id) ?? dest;
       void planJourney(dest, start, target, true);
       setStage("questions");
+      setAsked(0);
 
       return `Driving now. Say in one short sentence that you'll use the drive to prepare his pitch with four questions, then ask Question 1 word for word: "${PITCH_QUESTIONS[0]}"`;
     },
@@ -351,9 +366,11 @@ export function CarApp() {
       const asked = Number(args.question_number);
       const n = asked >= 1 && asked <= PITCH_QUESTIONS.length && answersRef.current[asked - 1] ? asked : (nextQuestion() ?? 0) + 1;
       answersRef.current[n - 1] = String(args.answer ?? "").trim() || "(no answer)";
+      setAnswers([...answersRef.current]);
       setAnswered(answersRef.current.filter(Boolean).length);
       const k = nextQuestion();
       if (k !== null) {
+        setAsked(k);
         return `Saved. Say only "Got it." and ask Question ${k + 1} word for word: "${PITCH_QUESTIONS[k]}". Never repeat a question he has already answered unless he asks you to.`;
       }
 
@@ -409,6 +426,7 @@ export function CarApp() {
   async function startCopilot() {
     copilotRef.current?.stop();
     setMuted(false);
+    setLines([]);
     setStage("where");
 
     const copilot = new VoiceCopilot({
@@ -416,7 +434,7 @@ export function CarApp() {
         setCopilotState(state);
         setCopilotDetail(detail ?? "");
       },
-      onTranscript: () => {},
+      onTranscript: (who, text) => setLines((prev) => [...prev.slice(-1), { who, text }]),
       tools,
     });
     copilotRef.current = copilot;
@@ -487,10 +505,11 @@ export function CarApp() {
           );
         })()}
         {journey.status === "loading" && (
-          <span className="absolute inset-x-4 top-16 z-[1000] rounded-lg bg-background/90 p-3 text-center text-base font-medium">
-            Loading Street View and parking analysis
-            {trip?.chain[trip.currentIndex] ? ` for Plan ${trip.chain[trip.currentIndex].label}` : " along your drive"}…
-          </span>
+          <StreetLoading
+            plan={trip?.chain[trip.currentIndex] ? `Plan ${trip.chain[trip.currentIndex].label}, ${lotById.get(trip.chain[trip.currentIndex].id)?.name}` : "your meeting"}
+            photos={journey.photos}
+            startedAt={journey.startedAt}
+          />
         )}
         {journey.status !== "ready" && route?.approximate && (
           <span className="absolute top-3 left-3 z-[1000] rounded-md bg-background/80 px-2.5 py-1 text-xs text-muted-foreground">Approximate route</span>
@@ -499,7 +518,7 @@ export function CarApp() {
       </div>
 
       <aside
-        className={cn("flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l", "max-h-[40dvh]")}
+        className={cn("flex shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-[400px] lg:border-t-0 lg:border-l", "max-h-[45dvh]")}
       >
         <div ref={panelRef} className="flex min-h-0 flex-1 flex-col gap-2 p-3">
           {/* Hands-free: a small mic button and Fundy. Everything else is said, or shown on the street view. */}
@@ -527,7 +546,34 @@ export function CarApp() {
             </button>
           )}
           {copilotState === "error" && <p className="text-center text-xs text-destructive">{copilotDetail}</p>}
-          <Fundy />
+          {voiceOn && (
+            <div ref={qaRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto text-sm leading-snug">
+              {asked === null
+                ? // Introduction: the last exchange.
+                  lines.map((l, i) => (
+                    <p key={i} className={l.who === "you" ? "text-muted-foreground" : "text-foreground"}>
+                      <span className="font-semibold">{l.who === "you" ? "You: " : "Plan P: "}</span>
+                      {l.text}
+                    </p>
+                  ))
+                : // The pitch: each question Plan P asked, and your answer.
+                  PITCH_QUESTIONS.slice(0, asked + 1).map((q, i) => (
+                    <div key={q} className="flex flex-col gap-0.5">
+                      <p className="font-semibold">
+                        <span className="text-primary">Q{i + 1}</span> {q}
+                      </p>
+                      {answers[i] ? (
+                        <p className="text-muted-foreground">You: {answers[i]}</p>
+                      ) : (
+                        stage === "questions" && <p className="animate-pulse text-subtle">Listening…</p>
+                      )}
+                    </div>
+                  ))}
+            </div>
+          )}
+          <div className="shrink-0">
+            <Fundy />
+          </div>
         </div>
       </aside>
     </div>

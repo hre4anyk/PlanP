@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getStore } from "@netlify/blobs";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { BRAIN_MODEL, STREET_VIEW_USD_PER_PHOTO, costUsd } from "@/ai/models";
@@ -45,6 +46,20 @@ For each photo, classify the right-hand curb into exactly one of three states:
 Look carefully at whether cars are actually parked along the curb to distinguish "free_to_park" from "occupied".
 These photos may be months or years old; judge what you see in each photo.`;
 
+type Verdict = { status: "free_to_park" | "cant_park" | "occupied"; kind: string; reason: string; box: { x: number; y: number; w: number; h: number } | null };
+
+// Verdicts belong to the street, not the driver: one per photo (panorama + heading), read once by
+// Claude and reused by every trip after (PRD §6). Netlify Blobs; outside Netlify there's no cache.
+function cache() {
+  try {
+    return getStore("planp-curb");
+  } catch {
+    return null;
+  }
+}
+const cacheKey = (pano: string, heading: number) => `${pano}/${Math.round(heading)}`;
+const quick = <T,>(p: Promise<T>, ms = 3000) => Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+
 type Meta = { status: string; pano_id?: string; date?: string; copyright?: string; location?: { lat: number; lng: number } };
 
 /** Google's own street-car imagery; photos uploaded by the public are often sideways, indoors or off-road. */
@@ -87,9 +102,16 @@ export async function POST(req: Request) {
     }));
   if (!frames.length) return Response.json({ frames: [], trace: { ms: Date.now() - started, costUsd: 0, photos: 0 } });
 
-  // 2. The photos themselves, then Claude reads them in small batches, in parallel.
-  const images = await Promise.all(frames.map((f) => photo(f.panoId, f.heading, key).catch(() => null)));
-  const usable = frames.map((f, i) => ({ ...f, image: images[i] })).filter((f) => f.image);
+  // 2. Streets we've read before come from the cache; only new photos are fetched and read.
+  const store = cache();
+  const cached = await Promise.all(
+    frames.map((f) => (store ? quick(store.get(cacheKey(f.panoId, f.heading), { type: "json" }) as Promise<Verdict | null>).catch(() => null) : null)),
+  );
+  const fresh = frames.filter((_, i) => !cached[i]);
+
+  // 3. The new photos, then Claude reads them in small batches, in parallel.
+  const images = await Promise.all(fresh.map((f) => photo(f.panoId, f.heading, key).catch(() => null)));
+  const usable = fresh.map((f, i) => ({ ...f, image: images[i] })).filter((f) => f.image);
   let tokensIn = 0;
   let tokensOut = 0;
   const batches: (typeof usable)[] = [];
@@ -124,28 +146,39 @@ export async function POST(req: Request) {
     }),
   );
 
-  const result = usable.map((f, i) => {
-    const batch = Math.floor(i / BATCH);
-    const v = verdicts[batch].find((p) => p.photo === (i % BATCH) + 1);
-    return {
-      lat: f.lat,
-      lng: f.lng,
-      walkMin: f.walkMin,
-      heading: f.heading,
-      date: f.date,
-      photoUrl: `/api/streetview/photo?pano=${encodeURIComponent(f.panoId)}&heading=${Math.round(f.heading)}`,
-      status: v?.status ?? "cant_park",
-      kind: v?.kind ?? "not checked",
-      reason: v?.reason ?? "Claude couldn't read this photo.",
-      box: v?.box ?? null,
-    };
+  const read = new Map<string, Verdict>();
+  usable.forEach((f, i) => {
+    const v = verdicts[Math.floor(i / BATCH)].find((p) => p.photo === (i % BATCH) + 1);
+    if (v) read.set(f.panoId, { status: v.status, kind: v.kind, reason: v.reason, box: v.box ?? null });
+  });
+  // Save what Claude read (never a failure), so the next trip down this street is instant.
+  if (store) await quick(Promise.all(usable.filter((f) => read.has(f.panoId)).map((f) => store.setJSON(cacheKey(f.panoId, f.heading), read.get(f.panoId)))), 3000).catch(() => null);
+
+  const result = frames.flatMap((f, i) => {
+    const v = cached[i] ?? read.get(f.panoId);
+    if (!v && !usable.some((u) => u.panoId === f.panoId)) return []; // no photo
+    return [
+      {
+        lat: f.lat,
+        lng: f.lng,
+        walkMin: f.walkMin,
+        heading: f.heading,
+        date: f.date,
+        photoUrl: `/api/streetview/photo?pano=${encodeURIComponent(f.panoId)}&heading=${Math.round(f.heading)}`,
+        status: v?.status ?? "cant_park",
+        kind: v?.kind ?? "not checked",
+        reason: v?.reason ?? "Claude couldn't read this photo.",
+        box: v?.box ?? null,
+      },
+    ];
   });
 
   return Response.json({
     frames: result,
     trace: {
       ms: Date.now() - started,
-      photos: usable.length,
+      photos: result.length,
+      cached: cached.filter(Boolean).length,
       costUsd: costUsd(BRAIN_MODEL, tokensIn, tokensOut) + usable.length * STREET_VIEW_USD_PER_PHOTO,
     },
   });
