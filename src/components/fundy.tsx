@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   DinoSprite,
   EggSprite,
@@ -54,6 +54,11 @@ function savedScore() {
   }
 }
 
+function subscribe(onChange: () => void) {
+  window.addEventListener(FED_EVENT, onChange);
+  return () => window.removeEventListener(FED_EVENT, onChange);
+}
+
 function getStage(score: number) {
   return STAGES.reduce((acc, s) => (score >= s.min ? s : acc), STAGES[0]);
 }
@@ -61,8 +66,8 @@ function getStage(score: number) {
 /** Fundy — a pixel dino mascot that grows when you practice your pitch.
  *  The voice copilot's pitch score feeds it (feedFundy); it never asks you to type. */
 export function Fundy() {
-  // Fundy only appears once a drive has started (after the page loaded), so reading storage here is safe.
-  const [score, setScore] = useState(savedScore);
+  // Points live in storage (shown from the first screen, 0 while the page is server-rendered).
+  const score = useSyncExternalStore(subscribe, savedScore, () => 0);
   const [result, setResult] = useState<{
     score: number;
     feedback: string;
@@ -72,9 +77,8 @@ export function Fundy() {
 
   useEffect(() => {
     const onFed = (e: Event) => {
-      const { total, ...data } = (e as CustomEvent<FedEvent>).detail;
+      const data = (e as CustomEvent<FedEvent>).detail;
       setResult(data);
-      setScore(total);
       setFed(true);
       setTimeout(() => setFed(false), 1500);
     };
