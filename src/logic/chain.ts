@@ -3,7 +3,8 @@ import { distanceMetres, walkMinutes } from "./geo";
 
 /** Lots more than this many minutes' walk from the meeting are ignored (PRD F8). */
 export const MAX_WALK_MIN = 15;
-export const CHAIN_SIZE = 5;
+/** Plan A plus two backups (founder: "3 places nearby in case Plan A doesn't work"); the chain grows when needed. */
+export const CHAIN_SIZE = 3;
 
 export type RankedLot = { lot: Lot; walkMin: number; metres: number };
 /** Shared with Park me and the Anbaric engine (ARCHITECTURE §3). `distance` is display text: "5 min walk". */

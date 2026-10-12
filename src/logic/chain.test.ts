@@ -42,10 +42,10 @@ describe("rankLots", () => {
 });
 
 describe("buildChain", () => {
-  it("labels the five best lots Plan A, B, C, D, E", () => {
+  it("labels the three best lots Plan A, B, C", () => {
     const chain = buildChain(frontier, LOTS);
-    expect(chain.map((c) => c.label)).toEqual(["A", "B", "C", "D", "E"]);
-    expect(chain.map((c) => c.id)).toEqual(rankLots(frontier, LOTS).slice(0, 5).map((r) => r.lot.id));
+    expect(chain.map((c) => c.label)).toEqual(["A", "B", "C"]);
+    expect(chain.map((c) => c.id)).toEqual(rankLots(frontier, LOTS).slice(0, 3).map((r) => r.lot.id));
     expect(chain[0].distance).toBe(`${rankLots(frontier, LOTS)[0].walkMin} min walk`);
   });
 
@@ -55,14 +55,14 @@ describe("buildChain", () => {
 });
 
 describe("extendChain", () => {
-  it("adds Plan F, G, H, I, J without repeating lots or using full ones", () => {
+  it("adds Plan D, E, F without repeating lots or using full ones", () => {
     const chain = buildChain(salesforce, LOTS);
-    const sixth = rankLots(salesforce, LOTS)[5].lot.id;
-    const grown = extendChain(chain, salesforce, LOTS, [sixth]);
-    expect(grown.slice(5).map((c) => c.label)).toEqual(["F", "G", "H", "I", "J"]);
+    const fourth = rankLots(salesforce, LOTS)[3].lot.id;
+    const grown = extendChain(chain, salesforce, LOTS, [fourth]);
+    expect(grown.slice(3).map((c) => c.label)).toEqual(["D", "E", "F"]);
     const ids = grown.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).not.toContain(sixth);
+    expect(ids).not.toContain(fourth);
   });
 
   it("keeps the chain unchanged when nothing is left", () => {
