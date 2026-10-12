@@ -24,9 +24,9 @@ const satoshi = localFont({
 const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Plan P — your backup parking, already planned",
+  title: "Plan P — park effortlessly, pitch confidently",
   description:
-    "Plan P lines up backup parking before you leave. If your garage is full, tap once and keep driving to the next one.",
+    "A hands-free voice copilot that lines up parking near your meeting, reads every curb from Street View, and rehearses your pitch on the drive.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,27 +1,31 @@
-# Plan P — Architecture (v1.0, simplified)
+# Plan P — Architecture (v1.1, hands-free)
 
 How the app is built, where each AI model is called, and why. Product requirements: [PRD.md](PRD.md). Prelint reviews pull requests against both files, so update this one in the same PR when a decision changes.
 
 ## 1. System overview
 
 ```
- PHONE BROWSER (Next.js client)                NEXT.JS SERVER (Netlify)                    PROVIDERS
- ┌──────────────────────────────┐             ┌──────────────────────────────┐
- │ GPS (start position)          │             │                              │
- │ Address search ───────────────┼── query ──► │ GET  /api/geocode            │──► OpenStreetMap Nominatim (free)
- │ Map (Leaflet + OSM tiles)     │             │                              │
- │ Route (OSRM, from the browser)│             │                              │
- │ Garage chain A/B/C            │             │                              │
- │ Street parking markers (S2) ──┼── route ──► │ POST /api/curb          (S2) │──► Google Street View Static API
- │                               │             │                              │──► Claude Opus 5.5 (reads photos)
- │ Voice copilot (S3) ◄══════════╪═ WebRTC ════╪══════════════════════════════╪══► OpenAI gpt-realtime-2.1-mini
- │   tool calls ─────────────────┼───────────► │ POST /api/voice-key     (S3) │──► OpenAI (short-lived key)
- │                               │             │ POST /api/research      (S3) │──► Claude Opus 5.5 + web search
- └──────────────────────────────┘             └──────────────────────────────┘
+ PHONE BROWSER (Next.js client)               NEXT.JS SERVER (Netlify)                     PROVIDERS
+ ┌───────────────────────────────┐           ┌───────────────────────────────┐
+ │ 🎙 Talk to Plan P  (only button)│           │ POST /api/voice-key           │──► OpenAI (short-lived key,
+ │ Voice copilot ◄═══════════════╪═ WebRTC ══╪═══════════════════════════════╪══►  instructions + 4 tools)
+ │   tools: set_destination,      │           │                               │    gpt-realtime-2.1-mini
+ │   start_drive, save_answer,    │           │ GET  /api/geocode             │──► OSM Nominatim
+ │   i_parked                     │           │                               │
+ │ Plans A–E (garage chain)       │           │ POST /api/curb                │──► Google Street View Static
+ │ Street journey (photos, curb   │──route──► │   (live plans B–E)            │──► Claude Opus 5.5 (eyes)
+ │   colour, minimap, hold)       │           │ GET  /api/streetview/photo    │──► Google (key stays here)
+ │ Arrival popup → next plan      │           │                               │
+ │ Pitch: 4 answers ──────────────┼─────────► │ POST /api/coach ─► queue ─────┼──► Netlify Blobs
+ │   poll /api/coach/result       │           │ POST /api/trip  ─► queue      │        ▲  │
+ │ Fundy (typed pitch, optional)  │─────────► │ POST /api/pitch               │──► Claude │  ▼
+ └───────────────────────────────┘           │ GET  /api/engine/queue ◄──────┼── ANBARIC ENGINE (polls 0.5 s)
+                                             │ POST /api/engine/result ◄─────┼──  jobs: trip, answer-review
+                                             └───────────────────────────────┘    agent claude-coach → Claude Opus 5.5
 ```
 
-- **One mode: Park my car.** Park me (chairs) and the live street camera were removed on 2026-10-11 (see D1); they remain in git history.
-- **Two AI models:** Claude Opus 5.5 (eyes on Street View, investor research) and OpenAI Realtime (voice). Keys stay on the server; the voice uses a short-lived key.
+- **One mode, hands-free.** The voice runs the whole trip; the screen shows what's happening. No forms.
+- **Two AI providers, three jobs:** OpenAI Realtime (voice), Claude Opus 5.5 (eyes on Street View; judge of the pitch). Keys stay on the server; the voice uses a short-lived key.
 - **Free building blocks:** OpenStreetMap tiles, OSRM routing, Nominatim geocoding.
 
 ## 2. Code layout
@@ -29,89 +33,99 @@ How the app is built, where each AI model is called, and why. Product requiremen
 ```
 src/
   app/
-    page.tsx                 landing page
-    car/page.tsx             the app (map + panel)
-    car/car-app.tsx          GPS start, address search, meeting time, route, garage chain, arrival estimate
-    api/geocode/route.ts     address → SF places (Nominatim, identifying User-Agent)
-    api/curb/route.ts        (S2) stretch points → Street View metadata + photos → Claude (batches of 6) → verdict per photo
-    api/streetview/photo/route.ts  (S2) photo proxy so the Google key never reaches the browser
-    api/voice-key/route.ts   (S3) short-lived OpenAI Realtime key
-    api/research/route.ts    (S3) Claude + web search: investor brief + likely questions
+    page.tsx                       landing page
+    car/car-app.tsx                the app: copilot + tools, plans A–E, street journey, hold, arrival → next plan, banner
+    api/voice-key/route.ts         short-lived OpenAI Realtime key; instructions, 4 tools, noise reduction, semantic VAD
+    api/geocode/route.ts           address → SF places (Nominatim)
+    api/curb/route.ts              points → Street View metadata (Google car only) + photos → Claude (batches of 6) → verdicts
+    api/streetview/photo/route.ts  photo proxy (netlify-vary on pano|heading so the CDN caches each photo separately)
+    api/coach/route.ts             whole pitch → queue for Anbaric, or `direct` → Claude scores it here
+    api/coach/result/route.ts      the browser polls for Anbaric's score
+    api/trip/route.ts              trip start / arrived → queue for Anbaric
+    api/engine/queue|result        the engine's side of the queue (x-planp-token = ENGINE_TOKEN)
+    api/pitch/route.ts             Fundy: score a typed pitch (Base44)
   ai/
-    models.ts                (S2) model IDs and list prices, one place
-    founder.ts               founder context from idea.md for the coach
-  voice/copilot.ts           WebRTC voice session, tool calls, queued app updates
-  data/lots.ts               12 fake SF garages + preset places
-  data/poc-route.json        the demo route (S2b): path, photo IDs, headings, Claude's verdicts; built by scripts/build-poc-route.mts
-  logic/
-    geo.ts                   distances, walk minutes (80 m/min)
-    chain.ts                 garage ranking (walk to meeting), A/B/C, extension
-    trip.ts                  "Lot is full" → next plan, grow the chain
-    route.ts                 OSRM route with per-leg paths and drive minutes; straight-line fallback
-    eta.ts                   arrival at the door vs meeting time
-    stretch.ts               (S2) points every ~50 m along the last 10 min walk, with driving bearing
-    *.test.ts                Vitest
+    models.ts                      model IDs and list prices
+    questions.ts                   the four pitch questions
+    coach.ts                       Claude's coaching rubric + JSON schema {score, strong, fix}
+    founder.ts                     founder context from idea.md
+  voice/copilot.ts                 WebRTC session, tool calls, queued app updates, mic mute
+  lib/engine-queue.ts              Netlify Blobs queue (enqueue, claim, complete, read), 4 s timeouts
+  data/lots.ts                     24 fake SF garages
+  data/poc-route.json              the demo route: path, photo IDs, headings, Claude's verdicts (scripts/build-poc-route.mts)
+  logic/                           geo, chain (plans A–E), trip (next plan), route (OSRM), eta, stretch, journey (Base44), maps links; *.test.ts
   components/
-    map-view.tsx             Leaflet map: garages, route snake, meeting flag, you; follows the current photo as a minimap
-    street-journey.tsx       (S2) the main view: Street View photos in driving order, Claude's curb box + verdict, ▶ Drive
+    street-journey.tsx             the main view: photos in driving order, curb box + verdict, autoplay with `holdAt`
+    map-view.tsx                   Leaflet map / minimap
+    arrival-popup.tsx              green / red / orange popup at the last photo (Base44)
+    route-plan-bar.tsx, spot-list.tsx, safe-map-container.tsx   (Base44)
+    fundy.tsx, fundy-sprites.tsx   the pixel dino that grows with pitch scores (Base44; fed by the voice score too)
+engine/                            the Anbaric app (separate package)
+  src/main.ts                      starts the app
+  src/machines.ts                  state machines `trip` (driving → arrived) and `answer-review` (submitted → scored)
+  src/claude.ts                    ClaudeClient for the Anbaric agent `claude-coach`
+  src/relay.ts                     polls each site's queue, runs jobs, posts results
 ```
 
 ## 3. Data shapes
 
 ```ts
 type LatLng = { lat: number; lng: number };
-type Place = LatLng & { name: string };                        // geocoded meeting place
-type ChainItem = { id: string; label: string; distance: string; reason: string };  // garage A/B/C
-type Leg = { path: LatLng[]; driveMin: number };               // one leg of the route
-// S2
-type CurbPoint = LatLng & {
-  allowed: "yes" | "no" | "unsure"; reason: string;            // e.g. "metered, 2 h", "red curb", "hydrant"
-  walkMin: number; side: "left" | "right"; photoDate: string; photoUrl: string;
+type Place = LatLng & { name: string };
+type ChainItem = { id: string; label: string; distance: string; reason: string };   // Plan A, B, …
+type Trip = { chain: ChainItem[]; currentIndex: number; fullIds: string[]; exhausted: boolean };
+type CurbFrame = LatLng & {                                   // one Street View photo along a drive
+  walkMin: number; heading: number; date: string; photoUrl: string;
+  status: "free_to_park" | "cant_park" | "occupied";          // green / red / orange
+  kind: string; reason: string; box: { x: number; y: number; w: number; h: number } | null;
 };
+type CoachScore = { score: number; strong: string; fix: string };   // the whole pitch, 1–10
 ```
 
 ## 4. Models
 
 | Job | Where | Model | In → out |
 |---|---|---|---|
-| Read Street View photos for parking rules (S2) | `/api/curb` | `claude-opus-5-5`, effort `low` | photos facing the curb → per photo `{ allowed, reason }` (structured output) |
-| Investor research + likely questions (S3) | `/api/research` | `claude-opus-5-5` with web search | name + firm → brief + 5 likely questions |
-| Voice copilot (S3) | browser ⇄ OpenAI over WebRTC | `gpt-realtime-2.1-mini` | speech ⇄ speech; tools `set_destination`, `research_investor`, `parking_options`, `i_parked` |
+| Voice copilot | browser ⇄ OpenAI over WebRTC | `gpt-realtime-2.1-mini`, voice `marin`, transcription `gpt-4o-mini-transcribe` | speech ⇄ speech; tools `set_destination`, `start_drive`, `save_answer`, `i_parked` |
+| Read the curb in Street View photos | `/api/curb` | `claude-opus-5-5`, effort `low`, JSON schema, server-side fallbacks | ≤ 6 photos per call → per photo `{ status, kind, reason, box }` |
+| Score the pitch | Anbaric agent `claude-coach` (`engine/`); fallback `/api/coach` `direct` | `claude-opus-5-5`, effort `low`, JSON schema | four Q&A → `{ score, strong, fix }` |
+| Fundy typed pitch | `/api/pitch` | `claude-opus-5-5`, effort `low` | text → `{ score, feedback }` |
 
-## 5. Key flows
+## 5. Key flow (S5, hands-free)
 
-**S1 — route:** GPS position on load (fallback: Fell & Van Ness, said on screen) → address search (`/api/geocode`, SF only) → optional meeting time → "Plan my parking" → garage chain A/B/C by walk to the meeting → OSRM route Start → A → B → C (or straight to the meeting if no garage is within 15 min walk) → status card: "Heading to Plan A… 10 min drive, 3 min walk. At the door 13:40, 20 min spare."
+1. **Talk.** "🎙 Talk to Plan P" → `/api/voice-key` mints a short-lived key with the instructions, the four tools, `noise_reduction: far_field` and `turn_detection: semantic_vad (low)` → `copilot.ts` opens WebRTC (mic in, voice out, data channel `oai-events`). Banner: "Tell Plan P where you're going".
+2. **`set_destination(address)`.** "South Park" → the precomputed demo meeting; anything else → `/api/geocode`. `startTrip` builds plans A–E (garages within 15 min walk, by walk time); `/api/trip` queues `trip_start` for Anbaric. Returns the plans; the voice says how many and asks "Let's go?".
+3. **`start_drive()`** after "yes". Frontier Tower → 2 S Park St replays `poc-route.json` instantly; other trips load live via `journey.ts` → `/api/curb`. Returns Question 1.
+4. **`save_answer(n, answer)`** ×4. Stores the answer, returns the next question; no scoring in between. **Hold:** while the voice is on and the pitch isn't scored, `StreetJourney` stops at the second-to-last photo (`holdAt`), so the four questions always finish before Plan A.
+5. **Scoring** (after answer 4). `/api/coach` queues the whole pitch in Netlify Blobs and returns an id; the Anbaric engine (polling every 0.5 s) runs an `answer-review` job scored by `claude-coach` and posts the result; the browser polls `/api/coach/result` every 0.6 s. After 13 s without a score, `/api/coach` with `direct` asks Claude itself. Measured: ~2–8 s via Anbaric. The result feeds the banner ("Pitch 7/10 · driving to Plan A"), the panel, Fundy, and the voice (score, strong, fix, where we're driving). The hold is released.
+6. **Arrival at a plan** (last photo). The page sends the voice "[Plan P app] Arrived at Plan A… Last photo: red, can't park (bike lane: …). The app is taking him to Plan B…" (queued if it's speaking). Green → `parked`, "park here". Red/orange → Base44's popup and, after 3.5 s, `markCurrentFull` → the next plan's drive loads live from this garage; no hold on later plans.
+7. **Mic off** disables the mic track (silence), so noise can't interrupt; the voice keeps talking.
 
-**S2 — the street journey (main view):** "Plan my parking" also fetches the drive straight to the meeting; `stretch.ts` samples a point every ~50 m along its last 10 minutes' walk (max 16). `/api/curb`: Street View metadata per point (free) → one photo per panorama, looking ahead and 25° right (how a driver glances at the curb) → Claude reads them in batches of 6, in parallel → per photo `{ allowed, kind, reason, box }`. The main area switches from the map to `StreetJourney`: the photo fills the screen, the judged curb outlined green/red/amber, "4 min walk to your meeting", the photo's date, ◀ ▶ / swipe and ▶ Drive auto-play; a minimap in the corner follows the photo. The panel lists the green stretches (tap to jump) and the trace (photos, seconds, cost). Founder choices: drive-through photos (not interactive 360°), minimap, right-hand curb only.
-
-**S2b — the demo route:** 995 Market St → 2 S Park St is precomputed once (route, a photo every 40 m along the whole drive, Claude's verdicts; $0.63 one-off) into `poc-route.json`. When the trip matches it, the journey appears instantly and auto-plays (0.7 s per photo while driving, 1.2 s in the parking zone, next 4 photos preloaded). Only photo IDs and verdicts are stored; images always come live through `/api/streetview/photo`. Verdicts show only within a 10-minute walk of the meeting; before that the view says "Driving". The demo starts at Frontier Tower; "Use my location" switches to GPS for live trips.
-
-**S4 — voice and drive in sync, Anbaric trip engine (built):** the copilot's tools are `set_destination`, `score_answer`, `i_parked`. Route set → the car drives stretch 1 (the route is split into 6 stretches, one per question) while the coach asks Question 1. `score_answer` → `/api/coach` → the car drives the next stretch while the coach gives the score and asks the next question; after Question 6 the result carries the average, the weakest question and the closest free parking. `/api/coach` and `/api/trip` put work on a queue in **Netlify Blobs** (`src/lib/engine-queue.ts`). The **Anbaric engine** (`engine/`, deployed at planp-engine.cloud.anbaric.ai) polls each site's `/api/engine/queue` every 0.5 s — Anbaric apps sit behind Anbaric's login, so the engine calls out rather than being called — runs the work as audited jobs (`trip`: driving → arrived; `answer-review`: submitted → scored by the Anbaric agent `claude-coach`, Claude Opus 5.5 at low effort), and posts results to `/api/engine/result`. `/api/coach` only queues and returns; the browser polls `/api/coach/result` every 0.6 s (each call capped at 3 s; Netlify stops functions at ~30 s) and, after 13 s without a score (measured: usually 5–8 s via Anbaric), asks `/api/coach` with `direct` to score with Claude itself, so the conversation never stalls. The copilot says "Got it, let me score that" while it waits. Secrets on Anbaric: `anthropic-key`, `engine-token`, `site-urls`; on Netlify: `ENGINE_TOKEN`.
-
-**S3 — copilot (superseded by S4 where they differ):** "🎙 Talk to Plan P" → `/api/voice-key` mints a short-lived OpenAI Realtime key (model `gpt-realtime-2.1-mini`, voice `marin`, input transcription, the instructions and four tools fixed server-side) → `src/voice/copilot.ts` opens WebRTC (mic in, voice out, data channel `oai-events`). Flow: greet → "where and when?" → `set_destination` (the demo address "2 South Park" maps to the precomputed route and starts the drive) → summary of drive, free street parking and garage backup → "who are you meeting?" → `research_investor` → `/api/research` (Claude Opus 5.5 + `web_search`, max 3 searches, resumes `pause_turn`; ~20 s, ~$0.11) → brief in the panel → coaching: one likely question, feedback in two sentences, next question. During the drive the page sends "[Plan P app] …" updates (free parking on the right, arrival); they queue while the copilot is speaking (one response at a time). `parking_options` and `i_parked` read the live trip. Replies are kept under 35 words. Founder context: `src/ai/founder.ts` (from idea.md).
+Earlier flows (S1 address form, S3 investor research, S4 one stretch per question with six scored answers) are in git history and superseded.
 
 ## 6. Fallbacks
 
 | Step | Fails how | Fallback |
 |---|---|---|
-| GPS | denied / indoors | Preset start, said on screen |
-| Address search | Nominatim down | Preset meeting places, tap on the map |
+| Voice | can't connect / mic blocked | Error with the fix shown on screen ("aA → Website Settings → Microphone"); tap Talk again |
+| Loud room | noise interrupts the voice | Mic off button; noise reduction; semantic VAD |
+| Geocode | not found | The voice asks him to repeat the street and number |
 | OSRM | > 5 s or error | Straight lines + "Approximate route" |
-| Street View / Claude (S2) | no key, no photo, error | Garages only; markers missing for that point |
-| Voice (S3) | can't connect | Text box + buttons |
-| Investor research (S3) | nothing found | Coach from idea.md with tough generic defense-VC questions |
+| Street View / Claude | no photo, error | Server-side model fallbacks; "Street View unavailable"; the garage is still the plan |
+| Anbaric engine | slow / down / queue error | Claude scores directly after 13 s |
+| Claude scoring | fails | The voice gives one honest sentence itself and carries on |
 
 ## 7. Environment variables
 
 | Name | Used by | Status |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | `/api/curb`, `/api/coach` | set (workspace-scoped key) |
-| `ENGINE_TOKEN` | `/api/coach`, `/api/trip`, `/api/engine/*` (shared with the Anbaric engine) | **to add on Netlify** |
+| `ANTHROPIC_API_KEY` | `/api/curb`, `/api/coach`, `/api/pitch` | set (Netlify, local) |
 | `OPENAI_API_KEY` | `/api/voice-key` | set |
-| `GOOGLE_MAPS_API_KEY` | `/api/curb` (Street View Static API) | **to add** before S2 |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | not used | set |
+| `GOOGLE_MAPS_API_KEY` | `/api/curb`, `/api/streetview/photo` | set |
+| `ENGINE_TOKEN` | `/api/engine/*` (shared with the Anbaric engine's `engine-token`) | set |
+| Anbaric secrets | `anthropic-key`, `engine-token`, `site-urls` | set |
 
-Set them in `.env.local` and on Netlify (Site configuration → Environment variables), then redeploy.
+Set them in `.env.local` and on Netlify (Site configuration → Environment variables), then redeploy. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 8. Development flow
 
@@ -129,6 +143,11 @@ One branch and pull request per sub-batch (PRD §5); Prelint reviews it; the fou
 | D6 | Free OSM stack for map, routing, geocoding; Google only for Street View | Fewer keys and costs; Google's photos are the one thing we can't get elsewhere |
 | D8 | Street View is the main view (drive-through photos), the map is a minimap | Founder: "it must be a street view as a human sees the street, not a 2D map" |
 | D9 | One precomputed demo route, iPhone first | Founder: keep it simple, one POC route that never fails on stage; more routes later |
-| D10 | The conversation sets the drive's pace (one question = one stretch); fixed 6 VC questions; Claude scores each answer; no live parking alerts | Founder: voice and screen were out of sync; the AI can't know a spot is free ahead from old Street View photos |
+| D10 | ~~One question = one stretch; 6 questions scored one by one~~ (superseded by D13); no live parking alerts | Founder: voice and screen were out of sync; the AI can't know a spot is free ahead from old Street View photos |
 | D11 | Anbaric hosts the trip engine (audited jobs, Claude as an Anbaric agent); the website stays on Netlify and talks to it through a queue the engine polls | Anbaric apps sit behind Anbaric's login (verified: 302 to Auth0), and Next.js doesn't fit Anbaric's no-build hosting |
-| D7 | Next.js on Netlify; Anbaric for the trip record (S5); Base44 waitlist; Prelint reviews | Reuse what works; sponsors where they add value |
+| D7 | Next.js on Netlify; Anbaric for the trip engine; Base44 builds UI on the same repo; Prelint reviews | Reuse what works; sponsors where they add value |
+| D12 | Hands-free: "Talk to Plan P" is the only control; the voice sets the destination and starts the drive ("Let's go?") | Founder: the driver can't touch the phone; one clear demo |
+| D13 | Four fixed questions, no per-answer scoring; Claude scores the whole pitch once, before Plan A (the drive holds at the second-to-last photo until then) | Founder: fewer interruptions, feedback on the pitch as a whole, always before arrival |
+| D14 | The last photo's colour at each plan drives the next step: green park, red/orange popup + next plan, and the voice says why | Founder: "the algo has a colour status for the last picture; based on this the agent takes next actions" |
+| D15 | Mic on/off button + noise reduction + semantic VAD | Founder: loud venue; nothing should interrupt the AI |
+| D16 | Fundy (Base44) is fed by the voice pitch score; its typed box stays optional | Founder: merge everything; gamification without breaking hands-free |

@@ -1,52 +1,47 @@
 # Plan P
 
-When your parking plan falls apart, Plan P already has a backup ready. It sees which spots are taken, tells you where to go next, and reroutes you without you touching the phone.
+**Park effortlessly. Pitch confidently. Plan P's got you covered.**
 
-Two modes: **Park me** (a phone camera finds you a free chair in a room, live demo) and **Park my car** (a backup chain of SF garages near your meeting).
+A hands-free voice copilot for the drive to your most important meeting. Say where you're going: Plan P lines up parking plans A, B, C… near the door, has Claude read Google Street View photos of each curb (green: free to park, red: can't park, orange: occupied), and rehearses your investor pitch with you on the way. Claude scores the whole pitch before you arrive. At each plan, the colour of the curb decides: park here, or on to the next plan.
 
-Built for the Multi Model Hackathon (SF Tech Week, Oct 11 2026). Fully vibe-coded from the PRD.
+Built in one day for the Multi Model Hackathon (SF Tech Week, Oct 11 2026). Fully vibe-coded with Claude Code and Base44.
 
-- [PRD.md](PRD.md): product, judging rubric, build plan
-- [ARCHITECTURE.md](ARCHITECTURE.md): components, API routes, where each model is called
-- [SUBMISSION.md](SUBMISSION.md): submission form draft
+- **Live:** https://getplanp.netlify.app/car (iPhone first: tap "Talk to Plan P", say "2 South Park Street")
+- [PRD.md](PRD.md): product, judging rubric, sub-batches
+- [ARCHITECTURE.md](ARCHITECTURE.md): components, API routes, where each model is called, decisions
+- [SUBMISSION.md](SUBMISSION.md): the submission form answers
+- [DEPLOYMENT.md](DEPLOYMENT.md): Netlify + Anbaric Cloud
 
 ## Models
 
 | Role | Model | Where it's called |
 |---|---|---|
-| Brain: plan the backup chain, photo checks ("is that the driver?") | Claude Opus 5.5 (Anthropic) | `engine/src/planner.ts`, `src/app/api/look/route.ts` |
-| Voice: speech-to-speech, calls Plan P actions as tools | gpt-realtime-2.1-mini (OpenAI) | `src/voice/realtime.ts` |
-| Camera watcher (on the phone, not an AI service) | MediaPipe EfficientDet-Lite0 | `src/vision/detector.ts` |
+| Eyes: reads Street View photos of the curb, structured verdict per photo | Claude Opus 5.5 | `src/app/api/curb/route.ts` |
+| Judge: scores the whole spoken pitch (as the Anbaric agent `claude-coach`) | Claude Opus 5.5 | `engine/src/machines.ts`, fallback `src/app/api/coach/route.ts` |
+| Voice: speech-to-speech copilot, drives the app through tools | OpenAI gpt-realtime-2.1-mini | `src/voice/copilot.ts`, session in `src/app/api/voice-key/route.ts` |
+| Fundy: scores a typed pitch to grow the dino | Claude Opus 5.5 | `src/app/api/pitch/route.ts` |
 
-## Status
+## Sponsors
 
-- [x] Landing page
-- [x] Clerk removed (no login in the demo)
-- [ ] Batch 1 — car: map + fake garages + deterministic chain + tests
-- [ ] Batch 2 — car: snake route + "Lot is full" + chain extension
-- [ ] Batch 3 — Park me: camera + on-device detection + free/taken seats + A/B/C
-- [ ] Batch 4 — Anbaric engine + Claude planner (both modes) + model trace
-- [ ] Batch 5 — Claude photo checks: "this is me", chair thief, Great landing
-- [ ] Batch 6 — voice (OpenAI Realtime with tools)
-- [ ] Batch 7 — open in Maps + simulate drive + landing buttons + waitlist QR
-- [ ] Batch 8 — rehearsal, video, submission
+- **Anbaric:** the trip engine in `engine/` (audited state machines `trip` and `answer-review`, Claude as an Anbaric agent), hosted on Anbaric Cloud.
+- **Base44:** parking plans A–E, the arrival popup, the spot list and Fundy were built in Base44 on the same repo (branch `base44/setup-515c62ae`).
+- **Prelint:** reviews pull requests against PRD.md and ARCHITECTURE.md.
 
 ## Stack
 
-- **Framework:** Next.js 16 (TypeScript)
-- **UI:** [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS
-- **Backend:** [Anbaric](https://github.com/anbaric-ai/anbaric-cloud) app in `engine/` (audited state machines, Claude agent), hosted on Anbaric Cloud
-- **AI:** Claude (Anthropic) and OpenAI Realtime; keys stay on the server
-- **Waitlist:** Base44
-- **Database:** Supabase (wired up, not used by the demo yet)
-- **Hosting:** Netlify for the web app, Anbaric Cloud for the engine (see [DEPLOYMENT.md](DEPLOYMENT.md))
-- **Code review:** Prelint on every pull request
+- **Web app:** Next.js 16 (TypeScript), Tailwind + shadcn/ui, on Netlify
+- **Map and routing:** Leaflet + OpenStreetMap tiles, OSRM routing, Nominatim geocoding (all free)
+- **Street View:** Google Street View Static API through a server proxy (the key never reaches the browser)
+- **Queue between site and engine:** Netlify Blobs
+- **Tests:** Vitest (`npm test`, 38 tests)
 
 ## Getting started
 
 ```bash
-cp .env.example .env.local   # then fill in the keys
+cp .env.example .env.local   # ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_MAPS_API_KEY, ENGINE_TOKEN
 npm install
-npm run dev                  # http://localhost:3000
-# engine (from batch 4): PORT=4000 npx tsx engine/src/main.ts
+npm run dev                  # http://localhost:3000/car
+npm test && npm run lint && npm run build
 ```
+
+The engine runs separately: see [engine/](engine/) and [DEPLOYMENT.md](DEPLOYMENT.md). Without it, the site scores pitches with Claude directly.
